@@ -20,12 +20,14 @@ jobs:
           latest: true
           extract: true
           fileName: "uosc.zip"
-          out-file-path: "scripts"
+          out-file-path: "scripts/uosc"
 
       - name: Sync uosc
-        uses: actions-js/push@master
-        with:
-          github_token: ${{ secrets.GH_PAT }}
+        run: |
+          git config --global user.name 'Yunuuuu'
+          git config --global user.email 'your-email@users.noreply.github.com'
+          git commit -m "New release version" scripts/uosc
+          git push
 
       - name: Run GitHub File Sync
         uses: BetaHuhn/repo-file-sync-action@v1
