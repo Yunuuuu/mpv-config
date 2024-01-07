@@ -10,16 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@master
+        uses: actions/checkout@v3
 
       # sync uosc
-      - uses: robinraju/release-downloader@v1.8
+      - name: Download uosc
+        uses: robinraju/release-downloader@v1.8
         with: 
           repository: "tomasklaen/uosc"
           latest: true
           extract: true
           fileName: "uosc.zip"
           out-file-path: "scripts"
+
+      - name: Sync uosc
+        uses: actions-js/push@master
+        with:
+          github_token: ${{ secrets.GH_PAT }}
 
       - name: Run GitHub File Sync
         uses: BetaHuhn/repo-file-sync-action@v1
