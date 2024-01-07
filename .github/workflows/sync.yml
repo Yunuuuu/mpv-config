@@ -1,0 +1,27 @@
+name: Sync Files
+on:
+  workflow_dispatch:
+  schedule:
+    # run every 4 hours
+    - cron: '20 */4 * * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@master
+
+      # sync uosc
+      - uses: robinraju/release-downloader@v1.8
+        with: 
+          repository: "tomasklaen/uosc"
+          latest: true
+          extract: true
+          fileName: "uosc.zip"
+          out-file-path: "scripts"
+
+      - name: Run GitHub File Sync
+        uses: BetaHuhn/repo-file-sync-action@v1
+        with:
+          GH_PAT: ${{ secrets.GH_PAT }}
