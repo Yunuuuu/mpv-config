@@ -24,6 +24,7 @@ jobs:
           out-file-path: "uosc"
 
       - run: |
+          rm -rf scripts/uosc
           mv uosc/scripts/uosc scripts/
           mv uosc/fonts/* fonts/
           rm -rf uosc
