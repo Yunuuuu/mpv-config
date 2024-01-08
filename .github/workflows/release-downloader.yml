@@ -28,13 +28,6 @@ jobs:
           mv uosc/scripts/uosc scripts/
           mv uosc/fonts/* fonts/
           rm -rf uosc
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add scripts
-          git add fonts
-          git commit -m "update uosc"
 
-      - uses: ad-m/github-push-action@master
-        with:
-          branch: ${{ github.ref }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: stefanzweifel/git-auto-commit-action@v5
+          commit_message: "update uosc"
