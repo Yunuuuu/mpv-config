@@ -9,12 +9,10 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       # sync uosc
-      - name: Download uosc
-        uses: robinraju/release-downloader@v1.8
+      - uses: robinraju/release-downloader@v1.8
         with: 
           repository: "tomasklaen/uosc"
           latest: true
@@ -22,14 +20,13 @@ jobs:
           fileName: "uosc.zip"
           out-file-path: "scripts"
 
-      - name: Sync uosc
-        run: |
+      - uses: fregante/setup-git-user@v2
+      - run: |
           rm scripts/uosc.zip
           git add scripts
           git commit -m "update uosc"
 
-      - name: Push changes
-        uses: ad-m/github-push-action@master
+      - uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GH_PAT }}
           branch: ${{ github.ref }}
