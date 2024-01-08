@@ -21,13 +21,16 @@ jobs:
           latest: true
           extract: true
           fileName: "uosc.zip"
-          out-file-path: "scripts"
+          out-file-path: "uosc"
 
       - run: |
-          rm scripts/uosc.zip
+          mv uosc/scripts/uosc scripts/uosc
+          mv uosc/fonts/* fonts/
+          rm -rf uosc
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add scripts
+          git add fonts
           git commit -m "update uosc"
 
       - uses: ad-m/github-push-action@master
