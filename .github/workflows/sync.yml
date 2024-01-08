@@ -26,8 +26,6 @@ jobs:
         run: |
           rm scripts/uosc.zip
           git add scripts
-          git config --global user.name 'Yunuuuu'
-          git config --global user.email 'your-email@users.noreply.github.com'
           git commit -m "update uosc"
 
       - name: Push changes
@@ -35,7 +33,6 @@ jobs:
         with:
           github_token: ${{ secrets.GH_PAT }}
           branch: ${{ github.ref }}
-          ssh: true
 
       - name: Run GitHub File Sync
         uses: BetaHuhn/repo-file-sync-action@v1
