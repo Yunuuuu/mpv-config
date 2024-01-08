@@ -29,7 +29,6 @@ jobs:
       - uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GH_PAT }}
-          branch: ${{ github.ref }}
 
       - name: Run GitHub File Sync
         uses: BetaHuhn/repo-file-sync-action@v1
