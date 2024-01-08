@@ -24,9 +24,10 @@ jobs:
 
       - name: Sync uosc
         run: |
+          ls
           git config --global user.name 'Yunuuuu'
           git config --global user.email 'your-email@users.noreply.github.com'
-          git commit -m "New release version" scripts/uosc
+          git commit -m "update uosc" scripts/uosc
           git push
 
       - name: Run GitHub File Sync
