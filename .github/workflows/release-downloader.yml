@@ -1,4 +1,4 @@
-name: Sync Files
+name: update scripts with release-downloader
 on:
   workflow_dispatch:
   schedule:
@@ -24,7 +24,7 @@ jobs:
           out-file-path: "uosc"
 
       - run: |
-          mv uosc/scripts/uosc scripts/uosc
+          mv uosc/scripts/uosc scripts/
           mv uosc/fonts/* fonts/
           rm -rf uosc
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -37,8 +37,3 @@ jobs:
         with:
           branch: ${{ github.ref }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run GitHub File Sync
-        uses: BetaHuhn/repo-file-sync-action@v1
-        with:
-          GH_PAT: ${{ secrets.GH_PAT }}
