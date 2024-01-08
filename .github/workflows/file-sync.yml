@@ -2,8 +2,8 @@ name: update scripts with file-sync
 on:
   workflow_dispatch:
   schedule:
-    # run every 4 hours
-    - cron: '20 */4 * * *'
+    # At 03:03 on Tuesday
+    - cron: '3 3 * * 2'
 
 jobs:
   sync:

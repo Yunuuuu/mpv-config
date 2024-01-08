@@ -2,8 +2,8 @@ name: update scripts with release-downloader
 on:
   workflow_dispatch:
   schedule:
-    # run every 4 hours
-    - cron: '20 */4 * * *'
+    # At 03:03 on Thursday
+    - cron: '3 3 * * 4'
 
 jobs:
   sync:
