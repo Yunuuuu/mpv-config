@@ -28,6 +28,8 @@ jobs:
 
       - uses: ad-m/github-push-action@master
         with:
+          repository: "Yunuuuu/mpv-config"
+          branch: main
           github_token: ${{ secrets.GH_PAT }}
 
       - name: Run GitHub File Sync
