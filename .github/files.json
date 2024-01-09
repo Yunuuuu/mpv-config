@@ -1,0 +1,20 @@
+[
+    {
+        "files": [
+            {
+                "source": "thumbfast.lua",
+                "target": "scripts/thumbfast.lua"
+            }
+        ],
+        "repository": "po5/thumbfast"
+    },
+    {
+        "files": [
+            {
+                "source": "scripts/auto-load-fonts.js",
+                "target": "scripts/auto-load-fonts.js"
+            }
+        ],
+        "repository": "Hill-98/mpv-config"
+    }
+]
