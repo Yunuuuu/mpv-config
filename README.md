@@ -9,7 +9,19 @@ I use scoop to install mpv, the scoop bucket I used was deposited in <https://gi
 scoop install jade/mpv
 ```
 
-### quickly set configurations
+### yt-dlp (optional)
+
+```powershell
+scoop install yt-dlp 
+```
+
+### ffmpeg (optional)
+
+```powershell
+scoop install ffmpeg
+```
+
+## Setting
 ```powershell
 cd ~/scoop/persist/mpv/portable_config
 git clone https://github.com/Yunuuuu/mpv-config .
