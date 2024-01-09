@@ -29,3 +29,16 @@ jobs:
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "update uosc"
+
+      # sync FSRCNNX
+      - run: rm -f shaders/FSRCNN*.glsl
+      - uses: robinraju/release-downloader@v1.8
+        with: 
+          repository: "igv/FSRCNN-TensorFlow"
+          latest: true
+          fileName: "*.glsl"
+          out-file-path: "shaders"
+
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "update the FSRCNN-TensorFlow"
