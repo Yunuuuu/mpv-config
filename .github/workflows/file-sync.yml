@@ -22,6 +22,12 @@ jobs:
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "update auto-load-fonts"
+
+      - run: ./.github/sync.sh AN3223/dotfiles .config/mpv/scripts/pickshader.lua scripts/
+      
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "update pickshader"
       
       - run: |
           ./.github/sync.sh bloc97/Anime4K glsl/Upscale/Anime4K_Upscale_CNN_x2_L.glsl shaders/
