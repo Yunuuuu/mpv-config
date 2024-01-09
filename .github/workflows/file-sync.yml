@@ -13,36 +13,12 @@ jobs:
 
       - run: ./.github/sync.sh po5/thumbfast thumbfast.lua scripts/thumbfast.lua
       
-      - name: Update files
-        uses: actions/github-script@v7
+      - uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          script: |
-            const { defaultBranch } = require("default-branch");
-            const { createWriteStream, readFileSync } = require("fs");
-            const { Readable } = require("stream");
-            const { finished } = require("stream/promises");
+          commit_message: "update thumbfast"
 
-            const list = JSON.parse(readFileSync(".github/files.json"));
-            for (const item of list) {
-              const { repository, settedBranch, files } = item;
-              let default = defaultBranch(repository);
-              let branch = settedBranch || default;
-              for (const file of files) {
-                const { source, target } = file;
-                let url = "";
-                if (branch === "@gist") {
-                  url = `https://gist.githubusercontent.com/${repository}/raw/${source}`;
-                } else if (branch === "@releases") {
-                  url = `https://github.com/${repository}/releases/latest/download/${source}`;
-                } else {
-                  url = `https://raw.githubusercontent.com/${repository}/${branch}/${source}`;
-                }
-                const response = await fetch(url);
-                const stream = createWriteStream(target);
-                await finished(Readable.fromWeb(response.body).pipe(stream));
-              }
-            }
+      - run: ./.github/sync.sh Hill-98/mpv-config scripts/auto-load-fonts.js
       
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "update"
+          commit_message: "update auto-load-fonts"
