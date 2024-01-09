@@ -11,13 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - run: ./scripts/sync.sh po5/thumbfast thumbfast.lua scripts/thumbfast.lua
+      - run: ./.github/sync.sh po5/thumbfast thumbfast.lua scripts/thumbfast.lua
       
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "update thumbfast"
 
-      - run: ./scripts/sync.sh Hill-98/mpv-config scripts/auto-load-fonts.js
+      - run: ./.github/sync.sh Hill-98/mpv-config scripts/auto-load-fonts.js
       
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
