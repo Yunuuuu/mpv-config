@@ -45,6 +45,15 @@ git clone https://github.com/Yunuuuu/mpv-config .
 
 - pickshader.lua
 
+[CogentRedTester/mpv-scripts](https://github.com/CogentRedTester/mpv-scripts)
+
+- keep_session.lua
+
+[Yunuuuu/mpv-config](https://github.com/Yunuuuu/mpv-config)
+
+- pause_replay.lua
+- add_video_rotate.lua
+
 [bjin/mpv-prescalers](https://github.com/bjin/mpv-prescalers/tree/master/gather)
 
 - nnedi3-nns128-win8x4.hook
@@ -80,8 +89,3 @@ git clone https://github.com/Yunuuuu/mpv-config .
 [an3223/dotfiles](https://github.com/AN3223/dotfiles/tree/master/.config/mpv/shaders)
 
 - nlmeans.glsl
-
-[Yunuuuu/mpv-config](https://github.com/Yunuuuu/mpv-config)
-
-- pause_replay.lua
-- add_video_rotate.lua
