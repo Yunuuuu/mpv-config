@@ -65,10 +65,16 @@ jobs:
           commit_message: "update nlmeans shaders"
       
       - run: |
-          ./.github/sync.sh bjin/mpv-prescalers nnedi3-nns128-win8x4.hook shaders/
-          ./.github/sync.sh bjin/mpv-prescalers ravu-lite-ar-r4.hook shaders/
-          ./.github/sync.sh bjin/mpv-prescalers ravu-zoom-ar-r3.hook shaders/
+          ./.github/sync.sh bjin/mpv-prescalers compute/nnedi3-nns128-win8x4.hook shaders/
+          ./.github/sync.sh bjin/mpv-prescalers compute/ravu-zoom-ar-r3.hook shaders/
 
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "update luma upscalers: nnedi3 and ravu"
+      
+      - run: |
+          ./.github/sync.sh Artoriuz/glsl-chroma-from-luma-prediction CfL_Prediction.glsl shaders/
+
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "update GLSL Chroma from Luma (CfL) Prediction"
