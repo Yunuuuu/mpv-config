@@ -1,7 +1,0 @@
-po5/thumbfast:
-  - source: thumbfast.lua
-    dest: scripts/thumbfast.lua
-
-Hill-98/mpv-config:
-  - source: scripts/auto-load-fonts.js
-    dest: scripts/auto-load-fonts.js
