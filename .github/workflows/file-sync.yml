@@ -31,18 +31,13 @@ jobs:
       
       - run: |
           ./.github/sync.sh bloc97/Anime4K glsl/Upscale/Anime4K_Upscale_CNN_x2_L.glsl shaders/
-          ./.github/sync.sh bloc97/Anime4K glsl/Upscale/Anime4K_Upscale_CNN_x2_M.glsl shaders/
-          ./.github/sync.sh bloc97/Anime4K glsl/Upscale/Anime4K_Upscale_CNN_x2_S.glsl shaders/
-          ./.github/sync.sh bloc97/Anime4K glsl/Experimental-Effects/Anime4K_Thin_HQ.glsl shaders/
-          ./.github/sync.sh bloc97/Anime4K glsl/Experimental-Effects/Anime4K_Darken_HQ.glsl shaders/
+          ./.github/sync.sh bloc97/Anime4K glsl/Upscale/Anime4K_Upscale_GAN_x2_M.glsl shaders/
 
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "update Anime4K"
 
-      # https://gist.github.com/agyild/bbb4e58298b2f86aa24da3032a0d2ee6
-      # https://gist.github.com/agyild/82219c545228d70c5604f865ce0b0ce5
-      # https://gist.github.com/agyild/7e8951915b2bf24526a9343d951db214
+      # https://gist.github.com
       - run: |
           ./.github/sync.sh agyild/bbb4e58298b2f86aa24da3032a0d2ee6 '@gist' CAS-scaled.glsl shaders/
           ./.github/sync.sh agyild/82219c545228d70c5604f865ce0b0ce5 '@gist' FSR.glsl shaders/
@@ -52,10 +47,6 @@ jobs:
         with:
           commit_message: "update AMD/NVIDIA shaders"
 
-      # https://gist.github.com/igv/8a77e4eb8276753b54bb94c1c50c317e
-      # https://gist.github.com/igv/a015fc885d5c22e6891820ad89555637
-      # https://gist.github.com/igv/36508af3ffc84410fe39761d6969be10
-      # https://gist.github.com/igv/2364ffa6e81540f29cb7ab4c9bc05b6b
       - run: |
           ./.github/sync.sh igv/8a77e4eb8276753b54bb94c1c50c317e '@gist' adaptive-sharpen.glsl shaders/
           ./.github/sync.sh igv/a015fc885d5c22e6891820ad89555637 '@gist' KrigBilateral.glsl shaders/
@@ -74,6 +65,7 @@ jobs:
           commit_message: "update nlmeans shaders"
       
       - run: |
+          ./.github/sync.sh bjin/mpv-prescalers nnedi3-nns128-win8x4.hook shaders/
           ./.github/sync.sh bjin/mpv-prescalers ravu-lite-ar-r4.hook shaders/
           ./.github/sync.sh bjin/mpv-prescalers ravu-zoom-ar-r3.hook shaders/
 
