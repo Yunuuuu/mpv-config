@@ -71,4 +71,4 @@ jobs:
 
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "update ravu shaders"
+          commit_message: "update luma upscalers: nnedi3 and ravu"
