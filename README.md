@@ -45,7 +45,7 @@ git clone https://github.com/Yunuuuu/mpv-config .
 
 - pickshader.lua
 
-[bjin/mpv-prescalers](https://github.com/bjin/mpv-prescalers/tree/master/compute)
+[bjin/mpv-prescalers](https://github.com/bjin/mpv-prescalers/tree/master/gather)
 
 - nnedi3-nns128-win8x4.hook
 - ravu-zoom-ar-r3.hook
