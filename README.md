@@ -41,6 +41,46 @@ git clone https://github.com/Yunuuuu/mpv-config .
 
 - auto-load-fonts.js
 
+[AN3223/dotfiles](https://github.com/AN3223/dotfiles)
+
+- pickshader.lua
+
+[bjin/mpv-prescalers](https://github.com/bjin/mpv-prescalers/tree/master/compute)
+
+- nnedi3-nns128-win8x4.hook
+- ravu-zoom-ar-r3.hook
+
+[bloc97/Anime4K](https://github.com/bloc97/Anime4K)
+
+- Anime4K_Upscale_CNN_x2_L.glsl
+- Anime4K_Upscale_GAN_x2_M.glsl
+
+[igv/FSRCNNX](https://github.com/igv/FSRCNN-TensorFlow/releases)
+
+- FSRCNNX_x2_8-0-4-1.glsl
+- FSRCNNX_x2_16-0-4-1.glsl
+
+[Artoriuz/glsl-chroma-from-luma-prediction](https://github.com/Artoriuz/glsl-chroma-from-luma-prediction)
+
+- CfL_Prediction.glsl
+
+[igv/gist](https://gist.github.com/igv)
+
+- KrigBilateral.glsl
+- SSimSuperRes.glsl
+- SSimDownscaler.glsl
+- adaptive-sharpen.glsl
+
+[agyild/gist](https://gist.github.com/agyild)
+
+- CAS-scaled.glsl
+- FSR.glsl
+- NVScaler.glsl
+
+[an3223/dotfiles](https://github.com/AN3223/dotfiles/tree/master/.config/mpv/shaders)
+
+- nlmeans.glsl
+
 [Yunuuuu/mpv-config](https://github.com/Yunuuuu/mpv-config)
 
 - pause_replay.lua
