@@ -17,6 +17,12 @@ jobs:
         with:
           commit_message: "update thumbfast"
 
+      - run: ./.github/sync.sh po5/memo memo.lua scripts/
+      
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "update memo"
+
       - run: ./.github/sync.sh Hill-98/mpv-config scripts/auto-load-fonts.js
       
       - uses: stefanzweifel/git-auto-commit-action@v5
