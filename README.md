@@ -37,6 +37,16 @@ git clone https://github.com/Yunuuuu/mpv-config .
 
 - thumbfast.lua
 
+[mpv-player/mpv](https://github.com/mpv-player/mpv/TOOLS/lua/autoload.lua)
+
+- autoload.lua
+
+[Yunuuuu/mpv-config](https://github.com/Yunuuuu/mpv-config)
+
+- pause_replay.lua
+- add_video_rotate.lua
+- sessions.lua
+
 [Hill-98/mpv-config](https://github.com/Hill-98/mpv-config)
 
 - auto-load-fonts.js
@@ -44,12 +54,6 @@ git clone https://github.com/Yunuuuu/mpv-config .
 [AN3223/dotfiles](https://github.com/AN3223/dotfiles)
 
 - pickshader.lua
-
-[Yunuuuu/mpv-config](https://github.com/Yunuuuu/mpv-config)
-
-- pause_replay.lua
-- add_video_rotate.lua
-- sessions.lua
 
 [bjin/mpv-prescalers](https://github.com/bjin/mpv-prescalers/tree/master/gather)
 
