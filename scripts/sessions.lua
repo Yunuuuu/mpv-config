@@ -97,7 +97,7 @@ local function check_bool(arg, default)
 end
 
 local function print_session_index()
-    mp.osd_message("Session index " .. cur_session .. "(" .. #sessions .. ")")
+    mp.osd_message("Session index " .. cur_session .. "/" .. #sessions)
 end
 
 --turns the json string into a table and adds all the files to the playlist
