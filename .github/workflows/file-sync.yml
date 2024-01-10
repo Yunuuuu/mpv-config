@@ -23,12 +23,6 @@ jobs:
         with:
           commit_message: "update memo"
 
-      - run: ./.github/sync.sh CogentRedTester/mpv-scripts keep-session.lua scripts/keep_session.lua
-      
-      - uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "update keep_session"
-
       - run: ./.github/sync.sh Hill-98/mpv-config scripts/auto-load-fonts.js
       
       - uses: stefanzweifel/git-auto-commit-action@v5
