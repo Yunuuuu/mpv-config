@@ -11,13 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - run: ./.github/sync.sh po5/thumbfast thumbfast.lua scripts/thumbfast.lua
+      - run: ./.github/sync.sh po5/thumbfast thumbfast.lua scripts/
       
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "update thumbfast"
       
-      - run: ./.github/sync.sh mpv-player/mpv TOOLS/lua/autoload.lua scripts/autoload.lua
+      - run: ./.github/sync.sh mpv-player/mpv TOOLS/lua/autoload.lua scripts/
       
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
