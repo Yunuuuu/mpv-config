@@ -285,6 +285,11 @@ local function save_sessions(file)
     oo:close()
 end
 
+local function save_hook()
+    if o.auto_save then save_sessions() end
+end
+mp.register_event('shutdown', save_hook)
+
 -- session can be nil, which indicates empty session, in this way, will do nothing.
 -- add the session playlist in current session, won't restart mpv process
 local function session_attach(session, load_playlist, maintain_pos)
@@ -367,6 +372,8 @@ local function session_load(session, watch_later, load_playlist, maintain_pos, a
             table.insert(session_args, file)
         end
     end
+    msg.debug("unregistering save_hook")
+    mp.unregister_event(save_hook)
     msg.debug('quiting current session')
     mp.command("quit")
     msg.debug('starting new session')
@@ -509,12 +516,6 @@ if not o.__by_loading__ then
 else
     msg.debug("found session created by `session_load`, skip intializing")
 end
-
-mp.register_event('shutdown', function()
-    if o.auto_save then
-        save_sessions()
-    end
-end)
 
 mp.register_script_message('save-session', save_sessions)
 mp.register_script_message('load-session', load_session)
