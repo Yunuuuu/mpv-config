@@ -61,9 +61,12 @@ local o = {
     -- only keep the same session once (session with same playlist, list order matters)
     allow_duplicated_session = false,
 
-    --maintain position in the playlist
-    --does nothing if load_playlist is disabled
+    -- maintain position in the playlist, do nothing if load_playlist is disabled
     maintain_pos = true,
+
+    -- if previous session is empty, but we do have history sessions, should the empty playlist be restored?
+    -- this occur if you quit manually with quit / stop command.
+    restore_empty = true,
 
     -- the default execution of mpv, usage for restart_mpv
     mpv_bin = "mpv",
@@ -152,6 +155,7 @@ opt.read_options(o)
 o.max_sessions = set_default(o.max_sessions, 10)
 o.max_sessions = tonumber(o.max_sessions)
 o.allow_duplicated_session = check_bool(o.allow_duplicated_session, false)
+o.restore_empty = check_bool(o.restore_empty, true)
 o.auto_load = check_bool(o.auto_load, true)
 o.auto_save = check_bool(o.auto_save, true)
 o.mpv_bin = set_default(o.mpv_bin, "mpv")
@@ -172,7 +176,7 @@ o.session_file = mp.command_native({ "expand-path", o.session_file })
 local function read_history_sessions(file)
     file = set_default(file, o.session_file)
     --loads the session file
-    msg.debug('reading previous session from', file)
+    msg.debug('reading history sessions from', file)
     local oo = io.open(file, "r")
 
     --this should only occur when loading the script for the first time,
@@ -184,6 +188,7 @@ local function read_history_sessions(file)
     -- read session index firstly
     msg.debug('reading session index')
     cur_session = tonumber(string.match(oo:read(), '^SessionIndex=(%d+)$')) or 0
+    msg.debug('setting session index:', cur_session)
 
     local session
     local wait_position = true
@@ -262,7 +267,11 @@ local function save_sessions(file)
     msg.debug('saving current session to', file)
     local oo = io.open(file, 'w')
     if not oo then return msg.error("Failed to write to file", file) end
-    oo:write("SessionIndex=" .. cur_session .. "\n")
+    if o.restore_empty and empty_session() then
+        oo:write("SessionIndex=" .. 0 .. "\n")
+    else
+        oo:write("SessionIndex=" .. cur_session .. "\n")
+    end
     for _, session in ipairs(sessions) do
         oo:write("[playlist]\n")
         for i, v in ipairs(session) do
@@ -480,18 +489,22 @@ if not o.__by_loading__ then
         mp.register_event("file-loaded", read_hook)
     elseif o.auto_load then
         msg.debug("loading previous session")
-        --Load the previous session if auto_load is enabled and the playlist is empty
-        --the function is not called until the first property observation is triggered to let everything initialise
-        --otherwise modifying playlist-start becomes unreliable
-        local function load_hook()
-            if cur_session == 0 then
-                cur_session = 1
-            end
-            load_session(cur_session)
-            msg.debug("unregistering load_hook")
-            mp.unobserve_property(load_hook)
+        if not o.restore_empty and cur_session == 0 then
+            cur_session = 1
         end
-        mp.observe_property("idle", "string", load_hook)
+        if cur_session > 0 then
+            --Load the previous session if auto_load is enabled and the playlist is empty
+            --the function is not called until the first property observation is triggered to let everything initialise
+            --otherwise modifying playlist-start becomes unreliable
+            local function load_hook()
+                load_session(cur_session)
+                msg.debug("unregistering load_hook")
+                mp.unobserve_property(load_hook)
+            end
+            mp.observe_property("idle", "string", load_hook)
+        else
+            msg.debug("nothing to do, since previous session is empty")
+        end
     end
 else
     msg.debug("found session created by `session_load`, skip intializing")
