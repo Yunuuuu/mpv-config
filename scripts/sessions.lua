@@ -65,7 +65,7 @@ local o = {
     maintain_pos = true,
 
     -- if previous session is empty, but we do have history sessions, should the empty playlist be restored?
-    -- this occur if you quit manually with quit / stop command.
+    -- this occur if you quit manually with stop command.
     restore_empty = true,
 
     -- the default execution of mpv, usage for restart_mpv
