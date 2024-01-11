@@ -69,31 +69,29 @@ local o = {
     mpv_bin = "mpv",
 }
 
-opt.read_options(o)
 
---sets the default session file to the watch_later directory or ~~/watch_later/
-if o.session_file == "" then
-    local watch_later = mp.get_property('watch-later-directory', "")
-    if watch_later == "" then watch_later = "~~state/watch_later/" end
-    if not watch_later:find("[/\\]$") then watch_later = watch_later .. '/' end
-
-    o.session_file = watch_later .. "mpv-sessions"
-end
-
-o.max_sessions = tonumber(o.max_sessions)
-o.session_file = mp.command_native({ "expand-path", o.session_file })
+-- prepare global variables ----------------------------
 sessions = {}
 cur_session = 0
 
+
+-- utils function --------------------------------------
+local function set_default(x, default)
+    if x == "" or x == nil then
+        return default
+    else
+        return x
+    end
+end
+
 local function check_bool(arg, default)
     if arg == 'yes' or arg == true then
-        arg = true
+        return true
     elseif arg == 'no' or arg == false then
-        arg = false
+        return false
     else
-        arg = default
+        return default
     end
-    return arg
 end
 
 local function print_session_index()
@@ -101,11 +99,6 @@ local function print_session_index()
 end
 
 local function check_session_index(i)
-    if not i then
-        mp.osd_message("Please provide the session index")
-        msg.debug("Please provide the session index")
-        return nil
-    end
     -- if no sessions, nothing to do
     local n = #sessions
     if n == 0 then
@@ -113,20 +106,70 @@ local function check_session_index(i)
         mp.osd_message("no history sessions")
         return nil
     end
-    -- if session index must be smaller than n
+    -- if session index must be smaller than n ang greater than 0
+    if not i then
+        mp.osd_message("Please provide the session index")
+        msg.debug("Please provide the session index")
+        return nil
+    end
     if i > n or i <= 0 then
-        msg.debug('no session ' .. i)
+        msg.debug('no session', i)
         mp.osd_message('no session ' .. i)
         return nil
     end
     return i
 end
 
---turns the json string into a table and adds all the files to the playlist
+local function index_session(i)
+    i = check_session_index(i)
+    if not i then
+        return nil
+    else
+        return sessions[i]
+    end
+end
+
+local function empty_session()
+    return mp.get_property_number('playlist-count', 0) == 0
+end
+
+local function match_session(session)
+    local value = table.concat(session, ";", 2)
+    local out = {}
+    for i, v in ipairs(sessions) do
+        if table.concat(v, ";", 2) == value then
+            table.insert(out, i)
+        end
+    end
+    return out
+end
+
+-- prepare arguments and set defaults ------------------------------
+opt.read_options(o)
+
+o.max_sessions = set_default(o.max_sessions, 10)
+o.max_sessions = tonumber(o.max_sessions)
+o.allow_duplicated_session = check_bool(o.allow_duplicated_session, false)
+o.auto_load = check_bool(o.auto_load, true)
+o.auto_save = check_bool(o.auto_save, true)
+o.mpv_bin = set_default(o.mpv_bin, "mpv")
+
+-- sets the default session file to the watch_later directory or ~~/watch_later/
+if o.session_file == "" or o.session_file == nil then
+    local watch_later_dir = mp.get_property('watch-later-directory', "")
+    if watch_later_dir == "" then watch_later_dir = "~~state/watch_later/" end
+    if not watch_later_dir:find("[/\\]$") then watch_later_dir = watch_later_dir .. '/' end
+    o.session_file = watch_later_dir .. "mpv-sessions"
+end
+
+o.session_file = mp.command_native({ "expand-path", o.session_file })
+
+-- turns the session_file into a table and adds all the files to the playlist
+-- return: adverse effect, modify global variable: sessions.
 local function read_history_sessions(file)
-    if not file or file == '' then file = o.session_file end
+    file = set_default(file, o.session_file)
     --loads the session file
-    msg.debug('loading previous session from', file)
+    msg.debug('reading previous session from', file)
     local oo = io.open(file, "r")
 
     --this should only occur when loading the script for the first time,
@@ -136,60 +179,80 @@ local function read_history_sessions(file)
         return
     end
 
-    local playlist
-    local idx = 1
-    for line in oo:lines() do
-        msg.debug('Debugging line: ' .. line)
-        if line == "[playlist]" then
+    local session
+    local wait_position = true
+
+    while true do
+        local line = oo:read()
+        msg.debug('Debugging line:', line)
+        if line == "[playlist]" or line == nil then
+            if session ~= nil then
+                -- check duplicates
+                if not o.allow_duplicated_session then
+                    local matches = match_session(session)
+                    if #matches > 0 then
+                        msg.debug('skip duplicated sessions')
+                        return nil
+                    end
+                end
+                -- save the previous session of read
+                table.insert(sessions, session)
+            end
+            if line == nil then break end
+            -- prepare the reading of the next session
             if #sessions == o.max_sessions then
                 msg.debug('excessive sessions')
                 break
             end
-            idx = 1
-        elseif idx == 1 then
+            wait_position = true
+        elseif wait_position then
             -- the first one should be the position of current playlist
             local pos = tonumber(line)
-            msg.debug('adding one session ...')
-            playlist = {}
-            table.insert(playlist, pos)
-            table.insert(sessions, playlist)
-            idx = idx + 1
+            msg.debug('adding one session')
+            session = {}
+            msg.debug('playlist position at', pos)
+            table.insert(session, pos)
+            wait_position = false
         else
-            table.insert(playlist, string.match(line, 'File=(.+)'))
+            local file_path = string.match(line, 'File=(.+)')
+            msg.debug('adding file:', file_path)
+            table.insert(session, file_path)
         end
     end
-    msg.debug('reading ' .. #sessions .. ' sessions')
-    if oo then oo:close() end
+    msg.debug('reading', #sessions, 'sessions')
+    oo:close()
 end
 
+-- return: nil if no playlist, otherwise, a table for current session
 local function read_current_session()
+    -- if empty session, return nil
+    if empty_session() then
+        return nil
+    end
+    -- otherwise, return a table
     local session = {}
     -- mpv uses 0 based array indices, but lua uses 1-based
     local working_directory = mp.get_property('working-directory')
     local playlist = mp.get_property_native('playlist')
     local pos = mp.get_property('playlist-pos')
-    if pos == -1 then
-        pos = mp.get_property('playlist-playing-pos')
-    end
-    msg.debug('playlist position ' .. pos)
+    msg.debug('playlist position at', pos)
     table.insert(session, pos)
     for _, v in ipairs(playlist) do
-        msg.debug('adding ' .. v.filename .. ' to playlist')
+        msg.debug('adding', v.filename, 'to playlist')
 
         --if the file is available then it attempts to expand the path in-case of relative playlists
         --presumably if the file contains a protocol then it shouldn't be expanded
         if not v.filename:find("^%a*://") then
             v.filename = utils.join_path(working_directory, v.filename)
-            msg.debug('expanded path: ' .. v.filename)
+            msg.debug('expanded path:', v.filename)
         end
         table.insert(session, v.filename)
     end
     return session
 end
 
-
 local function save_sessions(file)
-    if not file then file = o.session_file end
+    file = set_default(file, o.session_file)
     msg.debug('saving current session to', file)
     local oo = io.open(file, 'w')
     if not oo then return msg.error("Failed to write to file", file) end
@@ -207,40 +270,89 @@ local function save_sessions(file)
     oo:close()
 end
 
-local function start_session(session, watch_later, time_pos, load_playlist, maintain_pos)
+-- session can be nil, which indicates empty session, in this way, will do nothing.
+-- add the session playlist in current session, won't restart mpv process
+local function session_attach(session, load_playlist, maintain_pos)
+    if session ~= nil and #session > 0 then
+        msg.debug('session with', #session - 1, "videos")
+        local playlist = {}
+        local pos = 0
+        for ii, v in ipairs(session) do
+            if ii == 1 then
+                pos = v
+            else
+                table.insert(playlist, v)
+            end
+        end
+        load_playlist = check_bool(load_playlist, o.load_playlist)
+        if load_playlist then
+            msg.debug('reloading playlist')
+            for ii, v in ipairs(playlist) do
+                if ii == 1 then
+                    msg.debug('adding file:', v)
+                    mp.commandv('loadfile', v)
+                else
+                    msg.debug('adding file:', v)
+                    mp.commandv('loadfile', "append", v)
+                end
+            end
+            maintain_pos = check_bool(maintain_pos, o.maintain_pos)
+            if maintain_pos then
+                -- restore the original value unless the `playlist-start` property has been otherwise modified
+                if mp.get_property_number('playlist-start') ~= pos then
+                    msg.debug('setting playlist-start:', pos)
+                    mp.set_property('playlist-start', pos)
+                end
+            end
+        else
+            -- mpv uses 0 based array indices, but lua uses 1-based
+            mp.commandv('loadfile', playlist[pos + 1])
+        end
+    end
+end
+
+-- will start a new mpv process with the specified session playlist
+-- session can be nil, which indicates empty session
+local function session_load(session, watch_later, load_playlist, maintain_pos, args)
     local session_args = {
         o.mpv_bin,
-        "--pause=" .. mp.get_property("pause"),
         "--volume=" .. mp.get_property("volume"),
     }
     watch_later = check_bool(watch_later, false)
     if not watch_later then
+        msg.debug("setting --no-resume-playback")
         table.insert(session_args, "--no-resume-playback")
     end
-    msg.debug('session with ' .. #session - 1 .. " videos")
-    if #session > 0 then
-        if time_pos ~= nil then
-            msg.debug('setting video start: ' .. time_pos)
-            table.insert(session_args, "--start=" .. time_pos)
-        end
 
+    if args ~= nil and #args > 0 then
+        for _, v in ipairs(args) do
+            msg.debug("setting", v)
+            table.insert(session_args, v)
+        end
+    end
+    if session ~= nil and #session > 0 then
+        msg.debug('session with', #session - 1, "videos")
         load_playlist = check_bool(load_playlist, o.load_playlist)
         if load_playlist then
             maintain_pos = check_bool(maintain_pos, o.maintain_pos)
             for i, v in ipairs(session) do
                 if i == 1 and maintain_pos then
-                    msg.debug('setting playlist-start: ' .. v)
+                    msg.debug('setting --playlist-start=' .. v)
                     table.insert(session_args, "--playlist-start=" .. v)
                 else
-                    msg.debug('add file: ' .. v)
+                    msg.debug('adding file:', v)
                     table.insert(session_args, v)
                 end
             end
         else
             -- mpv uses 0 based array indices, but lua uses 1-based
-            table.insert(session_args, session[session[1] + 1])
+            local file = session[session[1] + 1]
+            msg.debug('starting file:', file)
+            table.insert(session_args, file)
         end
     end
+    msg.debug('quiting current session')
+    mp.command("quit")
     msg.debug('starting new session')
     mp.command_native({
         name = "subprocess",
@@ -248,64 +360,24 @@ local function start_session(session, watch_later, time_pos, load_playlist, main
         detach = true,
         args = session_args,
     })
-    msg.debug('quiting')
-    mp.command("quit")
 end
 
--- attach a session and don't restart mpv
 local function attach_session(i, load_playlist, maintain_pos)
-    i = check_session_index(i)
-    if i then
-        msg.debug("attaching session " .. i)
-        local session = sessions[i]
-        msg.debug('session with ' .. #session - 1 .. " videos")
-        if #session > 0 then
-            local playlist = {}
-            local pos = 0
-            for ii, v in ipairs(session) do
-                if ii == 1 then
-                    pos = v
-                else
-                    table.insert(playlist, v)
-                end
-            end
-
-            load_playlist = check_bool(load_playlist, o.load_playlist)
-            if load_playlist then
-                msg.debug('reloading playlist')
-                for ii, v in ipairs(playlist) do
-                    if ii == 1 then
-                        msg.debug('adding file: ' .. v)
-                        mp.commandv('loadfile', v)
-                    else
-                        msg.debug('adding file: ' .. v)
-                        mp.commandv('loadfile', "append", v)
-                    end
-                end
-                maintain_pos = check_bool(maintain_pos, o.maintain_pos)
-                if maintain_pos then
-                    -- restore the original value unless the `playlist-start` property has been otherwise modified
-                    if mp.get_property_number('playlist-start') ~= pos then
-                        msg.debug('setting playlist-start: ' .. pos)
-                        mp.set_property('playlist-start', pos)
-                    end
-                end
-            else
-                -- mpv uses 0 based array indices, but lua uses 1-based
-                mp.commandv('loadfile', playlist[pos + 1])
-            end
-            msg.debug('Setting current session index into ' .. i)
-            cur_session = i
-            print_session_index()
-        end
+    local session = index_session(i)
+    if session ~= nil then
+        msg.debug("attaching session", i)
+        session_attach(session, load_playlist, maintain_pos)
+        msg.debug('Setting current session index into', i)
+        cur_session = i
+        print_session_index()
     end
 end
 
 local function load_session(i, load_playlist, maintain_pos)
-    i = check_session_index(i)
-    if i then
-        msg.debug("loading session " .. i)
-        start_session(sessions[i], true, nil, load_playlist, maintain_pos)
+    local session = index_session(i)
+    if session ~= nil then
+        msg.debug("loading session", i)
+        session_load(session, true, load_playlist, maintain_pos)
     end
 end
 
@@ -359,39 +431,42 @@ end
 local function restart_mpv(watch_later, load_playlist, maintain_pos)
     msg.debug("reading current session")
     local session = read_current_session()
-    msg.debug("restarting...")
-    start_session(session, watch_later, mp.get_property("time-pos"), load_playlist, maintain_pos)
+    msg.debug("restarting ...")
+    local args
+    if session ~= nil then
+        args = {}
+        table.insert(args, "--start=" .. mp.get_property("time-pos"))
+        table.insert(args, "--pause=" .. mp.get_property("pause"))
+    else
+        args = nil
+    end
+    session_load(session, watch_later, load_playlist, maintain_pos, args)
 end
 
 read_history_sessions()
 
-o.allow_duplicated_session = check_bool(o.allow_duplicated_session, false)
-o.auto_load = check_bool(o.auto_load, true)
-o.auto_save = check_bool(o.auto_save, true)
-
-if mp.get_property_number('playlist-count', 0) > 0 then
+-- intialize session by adding current session or reload previous session
+if not empty_session() then
     -- if current playlist is not from sessions, add it into the first
     if cur_session == 0 then
-        msg.debug("reading current playlist...")
+        msg.debug("reading current playlist ...")
         local function read_hook()
             local session = read_current_session()
-            -- check duplciates
-            local value = table.concat(session, ";", 2)
-            if not o.allow_duplicated_session then
-                for i, v in ipairs(sessions) do
-                    if table.concat(v, ";", 2) == value then
-                        msg.debug('removing session ' .. i .. ' since duplication')
+            if session ~= nil then
+                if not o.allow_duplicated_session then
+                    local matches = match_session(session)
+                    for i, _ in ipairs(matches) do
+                        msg.debug('removing session', i, 'since duplication')
                         table.remove(sessions, i)
                     end
                 end
+                if #sessions == o.max_sessions then
+                    msg.debug('removing last session')
+                    table.remove(sessions)
+                end
+                table.insert(sessions, 1, session)
+                cur_session = 1
             end
-            -- insert current playlist
-            if #sessions == o.max_sessions then
-                msg.debug('removing last session')
-                table.remove(sessions)
-            end
-            table.insert(sessions, 1, session)
-            cur_session = 1
             msg.debug("unregistering read_hook")
             mp.unregister_event(read_hook)
         end
