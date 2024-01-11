@@ -145,6 +145,8 @@ local function match_session(session)
 end
 
 -- prepare arguments and set defaults ------------------------------
+-- internal usage, as a flag indicating current session was run by `session_load`
+o.__by_loading__ = "no"
 opt.read_options(o)
 
 o.max_sessions = set_default(o.max_sessions, 10)
@@ -153,6 +155,7 @@ o.allow_duplicated_session = check_bool(o.allow_duplicated_session, false)
 o.auto_load = check_bool(o.auto_load, true)
 o.auto_save = check_bool(o.auto_save, true)
 o.mpv_bin = set_default(o.mpv_bin, "mpv")
+o.__by_loading__ = check_bool(o.__by_loading__, false)
 
 -- sets the default session file to the watch_later directory or ~~/watch_later/
 if o.session_file == "" or o.session_file == nil then
@@ -178,6 +181,9 @@ local function read_history_sessions(file)
         msg.debug('no session, cancelling load')
         return
     end
+    -- read session index firstly
+    msg.debug('reading session index')
+    cur_session = tonumber(string.match(oo:read(), '^SessionIndex=(%d+)$')) or 0
 
     local session
     local wait_position = true
@@ -256,7 +262,7 @@ local function save_sessions(file)
     msg.debug('saving current session to', file)
     local oo = io.open(file, 'w')
     if not oo then return msg.error("Failed to write to file", file) end
-
+    oo:write("SessionIndex=" .. cur_session .. "\n")
     for _, session in ipairs(sessions) do
         oo:write("[playlist]\n")
         for i, v in ipairs(session) do
@@ -293,7 +299,7 @@ local function session_attach(session, load_playlist, maintain_pos)
                     mp.commandv('loadfile', v)
                 else
                     msg.debug('adding file:', v)
-                    mp.commandv('loadfile', "append", v)
+                    mp.commandv('loadfile', v, "append")
                 end
             end
             maintain_pos = check_bool(maintain_pos, o.maintain_pos)
@@ -316,6 +322,7 @@ end
 local function session_load(session, watch_later, load_playlist, maintain_pos, args)
     local session_args = {
         o.mpv_bin,
+        "--script-opts-append=" .. mp.get_script_name() .. "-__by_loading__=yes",
         "--volume=" .. mp.get_property("volume"),
     }
     watch_later = check_bool(watch_later, false)
@@ -431,7 +438,7 @@ end
 local function restart_mpv(watch_later, load_playlist, maintain_pos)
     msg.debug("reading current session")
     local session = read_current_session()
-    msg.debug("restarting ...")
+    msg.debug("restarting")
     local args
     if session ~= nil then
         args = {}
@@ -445,17 +452,17 @@ end
 
 read_history_sessions()
 
--- intialize session by adding current session or reload previous session
-if not empty_session() then
-    -- if current playlist is not from sessions, add it into the first
-    if cur_session == 0 then
-        msg.debug("reading current playlist ...")
+if not o.__by_loading__ then
+    -- intialize session by adding current session or reloading previous session
+    if not empty_session() then
+        -- if current playlist is not from load_session, add it into the first
+        msg.debug("reading current playlist")
         local function read_hook()
             local session = read_current_session()
             if session ~= nil then
                 if not o.allow_duplicated_session then
                     local matches = match_session(session)
-                    for i, _ in ipairs(matches) do
+                    for _, i in ipairs(matches) do
                         msg.debug('removing session', i, 'since duplication')
                         table.remove(sessions, i)
                     end
@@ -471,18 +478,23 @@ if not empty_session() then
             mp.unregister_event(read_hook)
         end
         mp.register_event("file-loaded", read_hook)
+    elseif o.auto_load then
+        msg.debug("loading previous session")
+        --Load the previous session if auto_load is enabled and the playlist is empty
+        --the function is not called until the first property observation is triggered to let everything initialise
+        --otherwise modifying playlist-start becomes unreliable
+        local function load_hook()
+            if cur_session == 0 then
+                cur_session = 1
+            end
+            load_session(cur_session)
+            msg.debug("unregistering load_hook")
+            mp.unobserve_property(load_hook)
+        end
+        mp.observe_property("idle", "string", load_hook)
     end
-elseif o.auto_load then
-    msg.debug("loading previous session...")
-    --Load the previous session if auto_load is enabled and the playlist is empty
-    --the function is not called until the first property observation is triggered to let everything initialise
-    --otherwise modifying playlist-start becomes unreliable
-    local function load_hook()
-        load_session(1)
-        msg.debug("unregistering load_hook")
-        mp.unobserve_property(load_hook)
-    end
-    mp.observe_property("idle", "string", load_hook)
+else
+    msg.debug("found session created by `session_load`, skip intializing")
 end
 
 mp.register_event('shutdown', function()
