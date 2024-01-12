@@ -15,12 +15,17 @@
 
     save session in specified file, if nil, will use session_file in config file
     script-message save-session [session-file]
-    script-message restart-mpv [watch-later: a bool indicate whether turn off watch-later using no-resume-playback, if no, will turn on no-resume-playback] [load_playlist] [maintain_pos]
+
+    restart mpv process
+    @param disable_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback, default: "yes".
+    @param saving A bool, indicates whether to run save_sessions before loading the new session
+    script-message restart-mpv [disable_watch_later] [saving] [load_playlist] [maintain_pos]
 
     load-session will restart mpv all setting will be reload
-    script-message load-session [session-index] [load_playlist] [maintain_pos]
-    script-message load-session-prev [load_playlist] [maintain_pos]
-    script-message load-session-next [load_playlist] [maintain_pos]
+    @param disable_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback, default: "no".
+    script-message load-session [session-index] [disable_watch_later] [saving] [load_playlist] [maintain_pos]
+    script-message load-session-prev [disable_watch_later] [saving] [load_playlist] [maintain_pos]
+    script-message load-session-next [disable_watch_later] [saving] [load_playlist] [maintain_pos]
 
     attach-session will attach the whole session playlist in current session, all setting will remain unchanged
     script-message attach-session [session-index] [load_playlist] [maintain_pos]
@@ -333,14 +338,15 @@ end
 
 -- will start a new mpv process with the specified session playlist
 -- session can be nil, which indicates empty session
-local function session_load(session, watch_later, load_playlist, maintain_pos, args)
+-- @param disable_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback
+-- @param saving A bool, indicates whether to run save_sessions before loading the new session
+local function session_load(session, disable_watch_later, saving, load_playlist, maintain_pos, args)
     local session_args = {
         o.mpv_bin,
         "--script-opts-append=" .. mp.get_script_name() .. "-__by_loading__=yes",
         "--volume=" .. mp.get_property("volume"),
     }
-    watch_later = check_bool(watch_later, false)
-    if not watch_later then
+    if disable_watch_later then
         msg.debug("setting --no-resume-playback")
         table.insert(session_args, "--no-resume-playback")
     end
@@ -372,8 +378,14 @@ local function session_load(session, watch_later, load_playlist, maintain_pos, a
             table.insert(session_args, file)
         end
     end
-    msg.debug("unregistering save_hook")
-    mp.unregister_event(save_hook)
+    -- whether unregistering save_hook
+    saving = check_bool(saving, true)
+    if not saving then
+        msg.debug("unregistering save_hook")
+        mp.unregister_event(save_hook)
+    end
+
+    -- when quiting, the save_hook will be run
     msg.debug('quiting current session')
     mp.command("quit")
     msg.debug('starting new session')
@@ -396,11 +408,12 @@ local function attach_session(i, load_playlist, maintain_pos)
     end
 end
 
-local function load_session(i, load_playlist, maintain_pos)
+local function load_session(i, disable_watch_later, saving, load_playlist, maintain_pos)
     local session = index_session(i)
     if session ~= nil then
         msg.debug("loading session", i)
-        session_load(session, true, load_playlist, maintain_pos)
+        disable_watch_later = check_bool(disable_watch_later, false)
+        session_load(session, disable_watch_later, saving, load_playlist, maintain_pos)
     end
 end
 
@@ -422,17 +435,17 @@ local function define_next()
     return i
 end
 
-local function load_session_prev(load_playlist, maintain_pos)
+local function load_session_prev(disable_watch_later, saving, load_playlist, maintain_pos)
     local i = define_prev()
     if i then
-        load_session(i, load_playlist, maintain_pos)
+        load_session(i, disable_watch_later, saving, load_playlist, maintain_pos)
     end
 end
 
-local function load_session_next(load_playlist, maintain_pos)
+local function load_session_next(disable_watch_later, saving, load_playlist, maintain_pos)
     local i = define_next()
     if i then
-        load_session(i, load_playlist, maintain_pos)
+        load_session(i, disable_watch_later, saving, load_playlist, maintain_pos)
     end
 end
 
@@ -451,7 +464,7 @@ local function attach_session_next(load_playlist, maintain_pos)
 end
 
 ----- Restart mpv
-local function restart_mpv(watch_later, load_playlist, maintain_pos)
+local function restart_mpv(disable_watch_later, saving, load_playlist, maintain_pos)
     msg.debug("reading current session")
     local session = read_current_session()
     msg.debug("restarting")
@@ -463,11 +476,12 @@ local function restart_mpv(watch_later, load_playlist, maintain_pos)
     else
         args = nil
     end
-    session_load(session, watch_later, load_playlist, maintain_pos, args)
+    disable_watch_later = check_bool(disable_watch_later, true)
+    session_load(session, disable_watch_later, saving, load_playlist, maintain_pos, args)
 end
 
+-- intializing sessions
 read_history_sessions()
-
 if not o.__by_loading__ then
     -- intialize session by adding current session or reloading previous session
     if not empty_session() then
@@ -504,7 +518,7 @@ if not o.__by_loading__ then
             --the function is not called until the first property observation is triggered to let everything initialise
             --otherwise modifying playlist-start becomes unreliable
             local function load_hook()
-                load_session(cur_session)
+                load_session(cur_session, false, false)
                 msg.debug("unregistering load_hook")
                 mp.unobserve_property(load_hook)
             end
