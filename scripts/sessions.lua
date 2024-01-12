@@ -4,7 +4,7 @@
     It remembers the playlist position the player was in when shutdown and reloads the playlist at that entry.
     This can be disabled with script-opts
 
-    The script saves a text file containing the the full playlist of 10 sessions (can be changed by `max_sessions`) in the watch_later directory (changeable via opts)
+    The script saves a text file containing the the full playlist of 5 sessions (can be changed by `max_sessions`) in the watch_later directory (changeable via opts)
     This file is saved in plaintext with the exact file paths of each playlist entry.
     Note that since it uses the same file, only the latest mpv window to be closed will be saved
 
@@ -24,7 +24,7 @@
     load-session will restart mpv all setting will be reload
     @param disable_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback, default: "no".
     @param saving A bool, indicates whether to run save_sessions before loading the new session
-    @param load_playlist A bool, indicates whether to run load whole playlist, if false, the file specified in 
+    @param load_playlist A bool, indicates whether to run load whole playlist, if false, the file specified in
            maintain_pos will be loaded. Default: use the script config option
     @param maintain_pos A bool or a number, indicates the start of the playlist, if true ("yes" can be okay),
            the original position will be used as the start point, if false ("no" will be the same), the first file
@@ -67,7 +67,7 @@ local o = {
     session_file = "",
 
     -- the maximal number of sessions to save
-    max_sessions = 10,
+    max_sessions = 5,
 
     -- only keep the same session once (session with same playlist, list order matters)
     allow_duplicated_session = false,
@@ -162,7 +162,7 @@ o.__by_loading__ = check_bool(o.__by_loading__, false)
 o.auto_save = check_bool(o.auto_save, true)
 o.auto_load = check_bool(o.auto_load, true)
 o.load_playlist = check_bool(o.load_playlist, true)
-o.max_sessions = set_default(o.max_sessions, 10)
+o.max_sessions = set_default(o.max_sessions, 5)
 o.max_sessions = tonumber(o.max_sessions)
 o.allow_duplicated_session = check_bool(o.allow_duplicated_session, false)
 -- for the config file, maintain_pos can only be a bool
@@ -558,22 +558,9 @@ else
     msg.debug("found session created by `session_load`, skip intializing")
 end
 
-mp.register_script_message('save-session', save_sessions)
-mp.register_script_message('load-session', load_session)
-mp.register_script_message('attach-session', attach_session)
-mp.register_script_message('load-session-prev', load_session_prev)
-mp.register_script_message('load-session-next', load_session_next)
-mp.register_script_message('attach-session-prev', attach_session_prev)
-mp.register_script_message('attach-session-next', attach_session_next)
-mp.register_script_message("restart-mpv", restart_mpv)
-
 -- define uosc menu ----------------------------------------
 local function command(str)
     return string.format('script-message-to %s %s', script_name, str)
-end
-
-local function basename(file)
-    return string.match(file, "([^\\]+)$")
 end
 
 local function session_menu_add_file(menu, session, session_index)
@@ -583,7 +570,7 @@ local function session_menu_add_file(menu, session, session_index)
         position = position - 1
         if position > 0 then
             table.insert(menu, {
-                title = basename(tostring(v)),
+                title = string.match(tostring(v), "([^\\]+)$"),
                 hint = tostring(position),
                 active = session_index == cur_session and active_position == position,
                 value = command("sessions-set-video " .. position .. " " .. session_index)
@@ -632,7 +619,7 @@ local function sessions_menu()
         local session = index_session(session_index)
         if session ~= nil then
             local future_menu = {}
-            table.insert(next_sessions_menu, { title = "Time machine", hint = "", items = future_menu })
+            table.insert(next_sessions_menu, { title = "Time machine", hint = "", items = future_menu, align = "right" })
             while session ~= nil do
                 local session_menu = {}
                 table.insert(future_menu, { title = "Session " .. session_index, hint = "", items = session_menu })
@@ -672,4 +659,13 @@ local function open_menu()
     mp.commandv('script-message-to', 'uosc', 'open-menu', json)
 end
 
-mp.add_forced_key_binding('h', 'sessions-open-menu', open_menu)
+mp.add_key_binding('h', 'sessions-open-menu', open_menu)
+
+mp.register_script_message('save-session', save_sessions)
+mp.register_script_message('load-session', load_session)
+mp.register_script_message('attach-session', attach_session)
+mp.register_script_message('load-session-prev', load_session_prev)
+mp.register_script_message('load-session-next', load_session_next)
+mp.register_script_message('attach-session-prev', attach_session_prev)
+mp.register_script_message('attach-session-next', attach_session_next)
+mp.register_script_message("restart-mpv", restart_mpv)
