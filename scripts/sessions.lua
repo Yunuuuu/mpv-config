@@ -194,7 +194,9 @@ o.__by_loading__ = set_default(o.__by_loading__, false)
 local function set_session(session_index)
     msg.debug('setting session index:', session_index)
     cur_session = session_index
-    sessions[cur_session][1] = mp.get_property_number("playlist-pos")
+    if cur_session > 0 then
+        sessions[cur_session][1] = mp.get_property_number("playlist-pos")
+    end
     mp.osd_message("Session " .. cur_session .. "/" .. #sessions)
 end
 
@@ -215,7 +217,7 @@ local function read_history_sessions(file)
     -- read session index firstly
     msg.debug('reading session index')
     -- if zero, means last session is empty
-    old_session = tonumber(string.match(oo:read(), '^SessionIndex=(%d+)$')) or 0
+    old_session = tonumber(string.match(oo:read(), '^OldSession=(%d+)$')) or 0
 
     local session
     local wait_position = true
@@ -291,21 +293,19 @@ end
 
 -- refresh current session when exit or switch between sessions
 local function refresh_session()
-    msg.debug("refreshing current session ", cur_session)
-    sessions[cur_session] = read_current_session()
+    if not empty_session() then
+        msg.debug("refreshing current session ", cur_session)
+        sessions[cur_session] = read_current_session()
+    end
 end
 
 local function save_sessions(file)
     file = set_default(file, o.session_file)
     local oo = io.open(file, 'w')
     if not oo then return msg.error("Failed to write to file", file) end
-    msg.debug('saving current session to', file)
-    if not empty_session() then
-        refresh_session()
-        oo:write("SessionIndex=" .. cur_session .. "\n")
-    else
-        oo:write("SessionIndex=" .. 0 .. "\n")
-    end
+    refresh_session()
+    msg.debug('saving sessions to', file)
+    oo:write("OldSession=" .. cur_session .. "\n")
     for _, session in ipairs(sessions) do
         oo:write("[playlist]\n")
         for i, v in ipairs(session) do
@@ -323,7 +323,6 @@ local function save_hook()
     if o.auto_save then save_sessions() end
 end
 mp.register_event('shutdown', save_hook)
-
 
 -- mpv use 0-based index
 local function check_position(maintain_pos, pos)
@@ -351,7 +350,7 @@ end
 local function session_attach(session_index, load_playlist, maintain_pos)
     local session = index_session(session_index)
     if session ~= nil and #session > 0 then
-        if not empty_session() then refresh_session() end
+        refresh_session()
         msg.debug('session with', #session - 1, "videos")
         local playlist = {}
         local pos = 0
@@ -392,6 +391,7 @@ end
 -- @param disable_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback
 -- @param saving A bool, indicates whether to run save_sessions before loading the new session
 local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
+    refresh_session()
     local session = index_session(session_index)
     local session_args = {
         o.mpv_bin,
@@ -431,12 +431,6 @@ local function session_load(session_index, disable_watch_later, saving, load_pla
             msg.debug('starting file:', file)
             table.insert(session_args, file)
         end
-    end
-    -- whether unregistering save_hook
-    saving = check_bool(saving, true)
-    if not saving then
-        msg.debug("unregistering save_hook")
-        mp.unregister_event(save_hook)
     end
 
     -- when quiting, the save_hook will be run
@@ -516,8 +510,9 @@ end
 
 ----- Restart mpv
 local function restart_mpv(disable_watch_later, saving)
-    local args
-    if cur_session > 0 then
+    local args, session_index
+    if empty_session() then session_index = 0 else session_index = cur_session end
+    if session_index > 0 then
         args = {}
         table.insert(args, "--start=" .. mp.get_property("time-pos"))
         table.insert(args, "--pause=" .. mp.get_property("pause"))
@@ -526,10 +521,10 @@ local function restart_mpv(disable_watch_later, saving)
     end
     disable_watch_later = check_bool(disable_watch_later, true)
     msg.debug("restarting")
-    session_load(cur_session, disable_watch_later, saving, true, true, args)
+    session_load(session_index, disable_watch_later, saving, true, true, args)
 end
 
--- intializing sessions
+-- intializing sessions, prepare old_session and cur_session
 read_history_sessions()
 
 if o.__by_loading__ then
