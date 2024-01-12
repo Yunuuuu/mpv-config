@@ -79,6 +79,10 @@ local o = {
     -- this occur if you quit manually with stop command.
     restore_empty = true,
 
+    -- the default action to switch video via uosc menu, "attach-session" (attach_session or attach)
+    -- or "load-session" (load_session or load)
+    switch_action = "attach",
+
     -- the default execution of mpv, usage for restart_mpv
     mpv_bin = "mpv",
 }
@@ -87,7 +91,7 @@ local o = {
 -- prepare global variables ----------------------------
 script_name = mp.get_script_name()
 sessions = {}
-cur_session = 0
+cur_session = 0 -- 0 means empty session
 
 
 -- utils function --------------------------------------
@@ -155,9 +159,14 @@ end
 
 -- prepare arguments and set defaults ------------------------------
 -- internal usage, as a flag indicating current session was run by `session_load`
-o.__by_loading__ = "no"
+o.__by_loading__ = "__no_session_load__"
 opt.read_options(o)
-o.__by_loading__ = check_bool(o.__by_loading__, false)
+
+if o.switch_action == "load-session" or o.switch_action == "load_session" or o.switch_action == "load" then
+    o.switch_action = "load"
+else
+    o.switch_action = "attach"
+end
 
 o.auto_save = check_bool(o.auto_save, true)
 o.auto_load = check_bool(o.auto_load, true)
@@ -198,6 +207,7 @@ local function read_history_sessions(file)
     end
     -- read session index firstly
     msg.debug('reading session index')
+    -- if zero, means last session is empty
     cur_session = tonumber(string.match(oo:read(), '^SessionIndex=(%d+)$')) or 0
     msg.debug('setting session index:', cur_session)
 
@@ -278,11 +288,7 @@ local function save_sessions(file)
     msg.debug('saving current session to', file)
     local oo = io.open(file, 'w')
     if not oo then return msg.error("Failed to write to file", file) end
-    if o.restore_empty and empty_session() then
-        oo:write("SessionIndex=" .. 0 .. "\n")
-    else
-        oo:write("SessionIndex=" .. cur_session .. "\n")
-    end
+    oo:write("SessionIndex=" .. cur_session .. "\n")
     for _, session in ipairs(sessions) do
         oo:write("[playlist]\n")
         for i, v in ipairs(session) do
@@ -325,7 +331,8 @@ end
 
 -- session can be nil, which indicates empty session, in this way, will do nothing.
 -- add the session playlist in current session, won't restart mpv process
-local function session_attach(session, load_playlist, maintain_pos)
+local function session_attach(session_index, load_playlist, maintain_pos)
+    local session = index_session(session_index)
     if session ~= nil and #session > 0 then
         msg.debug('session with', #session - 1, "videos")
         local playlist = {}
@@ -358,6 +365,9 @@ local function session_attach(session, load_playlist, maintain_pos)
             -- mpv uses 0 based array indices, but lua uses 1-based
             mp.commandv('loadfile', playlist[pos + 1])
         end
+        msg.debug('Setting current session index into', session_index)
+        cur_session = session_index
+        print_session_index()
     end
 end
 
@@ -365,10 +375,12 @@ end
 -- session can be nil, which indicates empty session
 -- @param disable_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback
 -- @param saving A bool, indicates whether to run save_sessions before loading the new session
-local function session_load(session, disable_watch_later, saving, load_playlist, maintain_pos, args)
+local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
+    local session = index_session(session_index)
     local session_args = {
         o.mpv_bin,
-        "--script-opts-append=" .. script_name .. "-__by_loading__=yes",
+        -- __by_loading__ as a hook, we can set cur_session in the new opened mpv process
+        "--script-opts-append=" .. script_name .. "-__by_loading__=" .. session_index,
         "--volume=" .. mp.get_property("volume"),
     }
     if disable_watch_later then
@@ -383,7 +395,8 @@ local function session_load(session, disable_watch_later, saving, load_playlist,
         end
     end
     if session ~= nil and #session > 0 then
-        pos = check_position(maintain_pos, session[1]) -- 0-based index
+        -- 0-based index
+        local pos = check_position(maintain_pos, session[1])
         msg.debug('session with', #session - 1, "videos")
         load_playlist = check_bool(load_playlist, o.load_playlist)
         if load_playlist then
@@ -423,24 +436,19 @@ local function session_load(session, disable_watch_later, saving, load_playlist,
 end
 
 local function attach_session(i, load_playlist, maintain_pos)
-    i = check_session_index(tonumber(i))
-    local session = index_session(i)
-    if session ~= nil then
-        msg.debug("attaching session", i)
-        session_attach(session, load_playlist, maintain_pos)
-        msg.debug('Setting current session index into', i)
-        cur_session = i
-        print_session_index()
+    local session_index = check_session_index(tonumber(i))
+    if session_index ~= nil then
+        msg.debug("attaching session", session_index)
+        session_attach(session_index, load_playlist, maintain_pos)
     end
 end
 
 local function load_session(i, disable_watch_later, saving, load_playlist, maintain_pos)
-    i = check_session_index(tonumber(i))
-    local session = index_session(i)
-    if session ~= nil then
-        msg.debug("loading session", i)
+    local session_index = check_session_index(tonumber(i))
+    if session_index ~= nil then
+        msg.debug("loading session", session_index)
         disable_watch_later = check_bool(disable_watch_later, false)
-        session_load(session, disable_watch_later, saving, load_playlist, maintain_pos)
+        session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos)
     end
 end
 
@@ -493,10 +501,9 @@ end
 ----- Restart mpv
 local function restart_mpv(disable_watch_later, saving)
     msg.debug("reading current session")
-    local session = read_current_session()
     msg.debug("restarting")
     local args
-    if session ~= nil then
+    if cur_session > 0 then
         args = {}
         table.insert(args, "--start=" .. mp.get_property("time-pos"))
         table.insert(args, "--pause=" .. mp.get_property("pause"))
@@ -504,12 +511,35 @@ local function restart_mpv(disable_watch_later, saving)
         args = nil
     end
     disable_watch_later = check_bool(disable_watch_later, true)
-    session_load(session, disable_watch_later, saving, true, true, args)
+    session_load(cur_session, disable_watch_later, saving, true, true, args)
 end
 
 -- intializing sessions
 read_history_sessions()
-if not o.__by_loading__ then
+
+if o.__by_loading__ ~= "__no_session_load__" then
+    msg.debug("found session created by `session_load`, skip intializing")
+    local function session_load_set()
+        cur_session = tonumber(o.__by_loading__)
+        msg.debug('Setting current index into loaded session', cur_session)
+        print_session_index()
+    end
+    if not empty_session() then
+        local function session_load_hook()
+            session_load_set()
+            msg.debug("unregistering session_load_hook")
+            mp.unregister_event(session_load_hook)
+        end
+        mp.register_event("file-loaded", session_load_hook)
+    else
+        local function session_load_hook()
+            session_load_set()
+            msg.debug("unregistering session_load_hook")
+            mp.unobserve_property(session_load_hook)
+        end
+        mp.observe_property("idle", "string", session_load_hook)
+    end
+else
     -- intialize session by adding current session or reloading previous session
     if not empty_session() then
         -- if current playlist is not from load_session, add it into the first
@@ -554,9 +584,8 @@ if not o.__by_loading__ then
             msg.debug("nothing to do, since previous session is empty")
         end
     end
-else
-    msg.debug("found session created by `session_load`, skip intializing")
 end
+
 
 -- define uosc menu ----------------------------------------
 local function command(str)
@@ -651,15 +680,18 @@ local function open_menu()
             -- mpv use 0-based index but sessions-script and lua use 1-based index
             mp.set_property('playlist-pos', video_index - 1)
         else
-            local session = sessions[session_index]
-            session_load(session, false, true, true, video_index)
+            if o.switch_action == "load" then
+                session_load(session_index, false, true, true, video_index)
+            else
+                session_attach(session_index, true, video_index)
+            end
         end
     end)
     local json = utils.format_json(sessions_menu())
     mp.commandv('script-message-to', 'uosc', 'open-menu', json)
 end
 
--- expose functions 
+-- expose functions
 mp.register_script_message('save-session', save_sessions)
 mp.register_script_message('load-session', load_session)
 mp.register_script_message('attach-session', attach_session)
