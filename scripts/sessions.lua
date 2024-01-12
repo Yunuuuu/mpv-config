@@ -659,8 +659,7 @@ local function open_menu()
     mp.commandv('script-message-to', 'uosc', 'open-menu', json)
 end
 
-mp.add_key_binding('h', 'sessions-open-menu', open_menu)
-
+-- expose functions 
 mp.register_script_message('save-session', save_sessions)
 mp.register_script_message('load-session', load_session)
 mp.register_script_message('attach-session', attach_session)
@@ -669,3 +668,27 @@ mp.register_script_message('load-session-next', load_session_next)
 mp.register_script_message('attach-session-prev', attach_session_prev)
 mp.register_script_message('attach-session-next', attach_session_next)
 mp.register_script_message("restart-mpv", restart_mpv)
+mp.register_script_message('uosc-version', function(version)
+    ---Like the comperator for table.sort, this returns v1 < v2
+    ---Assumes two valid semver strings
+    ---@param v1 string
+    ---@param v2 string
+    ---@return boolean
+    local function semver_comp(v1, v2)
+        local v1_iterator = v1:gmatch('%d+')
+        local v2_iterator = v2:gmatch('%d+')
+        for v2_num_str in v2_iterator do
+            local v1_num_str = v1_iterator()
+            if not v1_num_str then return true end
+            local v1_num = tonumber(v1_num_str)
+            local v2_num = tonumber(v2_num_str)
+            if v1_num < v2_num then return true end
+            if v1_num > v2_num then return false end
+        end
+        return false
+    end
+    local min_version = '4.6.0'
+    local uosc_available = not semver_comp(version, min_version)
+    if not uosc_available then return end
+    mp.add_key_binding('h', 'sessions-open-menu', open_menu)
+end)
