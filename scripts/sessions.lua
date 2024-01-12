@@ -299,13 +299,16 @@ local function refresh_session()
     end
 end
 
-local function save_sessions(file)
+local function sessions_save(file)
     file = set_default(file, o.session_file)
     local oo = io.open(file, 'w')
     if not oo then return msg.error("Failed to write to file", file) end
-    refresh_session()
     msg.debug('saving sessions to', file)
-    oo:write("OldSession=" .. cur_session .. "\n")
+    if empty_session() then
+        oo:write("OldSession=" .. 0 .. "\n")
+    else
+        oo:write("OldSession=" .. cur_session .. "\n")
+    end
     for _, session in ipairs(sessions) do
         oo:write("[playlist]\n")
         for i, v in ipairs(session) do
@@ -319,10 +322,15 @@ local function save_sessions(file)
     oo:close()
 end
 
+local function save_sessions(file)
+    refresh_session()
+    sessions_save(file)
+end
+
 local function save_hook()
     if o.auto_save then save_sessions() end
 end
-mp.register_event('shutdown', save_hook)
+mp.register_event("shutdown", save_hook)
 
 -- mpv use 0-based index
 local function check_position(maintain_pos, pos)
@@ -392,6 +400,10 @@ end
 -- @param saving A bool, indicates whether to run save_sessions before loading the new session
 local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
     refresh_session()
+    mp.unregister_event(save_hook)
+    mp.register_event("shutdown", function()
+        if o.auto_save then sessions_save() end
+    end)
     local session = index_session(session_index)
     local session_args = {
         o.mpv_bin,
@@ -433,7 +445,6 @@ local function session_load(session_index, disable_watch_later, saving, load_pla
         end
     end
 
-    -- when quiting, the save_hook will be run
     msg.debug('quiting current session')
     mp.command("quit")
     msg.debug('starting new session')
