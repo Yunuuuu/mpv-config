@@ -294,7 +294,7 @@ end
 -- refresh current session when exit or switch between sessions
 local function refresh_session()
     if not empty_session() then
-        msg.debug("refreshing current session ", cur_session)
+        msg.debug("refreshing current session", cur_session)
         sessions[cur_session] = read_current_session()
     end
 end
