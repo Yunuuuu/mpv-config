@@ -249,16 +249,14 @@ local function read_history_sessions(file)
             table.insert(session, file_path)
         end
     end
-    msg.debug('reading', #sessions, 'sessions')
+    msg.debug('imported', #sessions, 'sessions')
     oo:close()
 end
 
--- return: nil if no playlist, otherwise, a table for current session
+-- We should always check if current session is empty (empty_session()) before reading current session
+-- since we use cur_session = 0 indicates empty session and index_sessioon for zero always return nil 
+-- return: current session table
 local function read_current_session()
-    -- if empty session, return nil
-    if empty_session() then return nil end
-
-    -- otherwise, return a table
     local session = {}
     -- mpv uses 0 based array indices, but lua uses 1-based
     local working_directory = mp.get_property('working-directory')
@@ -283,30 +281,28 @@ end
 -- helper function to change `cur_session`
 -- 1. when switching session: session_attach, initialize_load
 -- 2. when open new windows: initialize_open
-local function set_current_index(session_index)
+local function update_current_index(session_index)
     msg.debug('setting session index:', session_index)
     cur_session = session_index
     mp.osd_message("Session " .. cur_session .. "/" .. #sessions)
 end
 
--- helper function to change the first item of current session
--- 1. when switching session: session_attach, initialize_load
--- 2. when open new windows: initialize_open
+-- helper function to change the first item of session after switching with session_attach, initialize_load
+-- always update current index firstly before update playlist-pos. 
 local function update_session_pos()
     if cur_session > 0 then
         sessions[cur_session][1] = mp.get_property_number("playlist-pos")
     end
 end
 
--- refresh current session
+-- refresh current session, if necessary, update the session index for empty session
 -- 1. when exit: save_hook
 -- 2. when switch session: session_attach, session_load
 -- 3. when query uosc menu
-local function update_session()
-    local session = read_current_session()
-    if session ~= nil then
+local function refresh_session()
+    if not empty_session() then
         msg.debug("refreshing current session", cur_session)
-        sessions[cur_session] = session
+        sessions[cur_session] = read_current_session()
     else
         cur_session = 0
     end
@@ -332,7 +328,7 @@ local function sessions_save(file)
 end
 
 local function save_sessions(file)
-    update_session()
+    refresh_session()
     sessions_save(file)
 end
 
@@ -367,7 +363,7 @@ end
 local function session_attach(session_index, load_playlist, maintain_pos)
     local session = index_session(session_index)
     if session ~= nil and #session > 0 then
-        update_session()
+        refresh_session()
         msg.debug('session with', #session - 1, "videos")
         local playlist = {}
         local pos = 0
@@ -399,7 +395,7 @@ local function session_attach(session_index, load_playlist, maintain_pos)
             -- mpv uses 0 based array indices, but lua uses 1-based
             mp.commandv('loadfile', playlist[pos + 1])
         end
-        set_current_index(session_index)
+        update_current_index(session_index)
         update_session_pos()
     end
 end
@@ -409,7 +405,7 @@ end
 -- @param disable_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback
 -- @param saving A bool, indicates whether to run save_sessions before loading the new session
 local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
-    update_session()
+    refresh_session()
     mp.unregister_event(save_hook)
     mp.register_event("shutdown", function()
         if o.auto_save then sessions_save() end
@@ -568,7 +564,7 @@ local function initialize_open()
                 table.remove(sessions)
             end
             table.insert(sessions, 1, session)
-            set_current_index(1)
+            update_current_index(1)
             msg.debug("unregistering read_hook")
             mp.unregister_event(read_hook)
         end
@@ -590,12 +586,12 @@ local function initialize_open()
             end
             mp.observe_property("idle", "string", load_hook)
         else
-            set_current_index(0)
+            update_current_index(0)
             msg.debug("nothing to do, since previous session is empty")
         end
     else
         msg.debug("initializing by loading previous session")
-        set_current_index(0)
+        update_current_index(0)
     end
 end
 
@@ -603,7 +599,7 @@ local function initialize_load()
     msg.debug("intializing session created by `session_load`")
     local function session_load_index()
         local session_index = tonumber(o.__by_loading__)
-        set_current_index(session_index) -- for session_load
+        update_current_index(session_index) -- for session_load
         update_session_pos()
     end
     if not empty_session() then
@@ -654,7 +650,7 @@ local function session_menu_add_file(menu, session, session_index)
 end
 
 local function sessions_menu()
-    update_session()
+    refresh_session()
     local menu = {
         type = 'sessions',
         title = 'Playlist',
