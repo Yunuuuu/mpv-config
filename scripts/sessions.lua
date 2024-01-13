@@ -268,9 +268,8 @@ end
 -- return: nil if no playlist, otherwise, a table for current session
 local function read_current_session()
     -- if empty session, return nil
-    if empty_session() then
-        return nil
-    end
+    if empty_session() then return nil end
+
     -- otherwise, return a table
     local session = {}
     -- mpv uses 0 based array indices, but lua uses 1-based
@@ -543,13 +542,15 @@ end
 
 -- intializing session start by open mpv, prepare old_session and cur_session
 local function initialize_open()
-    msg.debug("reading current playlist")
-    local session = read_current_session()
     -- intialize session by adding current session or reloading previous session
-    if session ~= nil then
+    if not empty_session() then
         msg.debug("initializing by adding current playlist")
         -- for session with playlist, add it into the first
+        -- the function is not called until the file-loaded completed to let everything initialise
+        -- otherwise reading current playlist becomes unreliable
         local function read_hook()
+            msg.debug("reading current playlist")
+            local session = read_current_session()
             if not o.allow_duplicated_session then
                 local matches = match_session(session)
                 for _, i in ipairs(matches) do
@@ -574,9 +575,9 @@ local function initialize_open()
             old_session = 1
         end
         if old_session > 0 then
-            --Load the previous session if auto_load is enabled and the playlist is empty
-            --the function is not called until the first property observation is triggered to let everything initialise
-            --otherwise modifying playlist-start becomes unreliable
+            -- Load the previous session if auto_load is enabled and the playlist is empty
+            -- the function is not called until the first property observation is triggered to let everything initialise
+            -- otherwise modifying playlist-start becomes unreliable
             local function load_hook()
                 load_session(old_session, false, false)
                 msg.debug("unregistering load_hook")
