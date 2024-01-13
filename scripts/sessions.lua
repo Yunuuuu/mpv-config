@@ -191,7 +191,9 @@ msg.debug("getting option __by_loading__:", o.__by_loading__)
 o.__by_loading__ = set_default(o.__by_loading__, false)
 
 -- helper function to change `cur_session`
-local function set_session(session_index)
+-- 1. when switching session: session_attach, initialize_load
+-- 2. when open new windows: initialize_open
+local function set_current_session(session_index)
     msg.debug('setting session index:', session_index)
     cur_session = session_index
     if cur_session > 0 then
@@ -291,11 +293,15 @@ local function read_current_session()
     return session
 end
 
--- refresh current session when exit or switch between sessions
-local function refresh_session()
-    if not empty_session() then
+-- refresh current session
+-- 1. when exit: save_hook
+-- 2. when switch session: session_attach, session_load
+-- 3. when query uosc menu
+local function update_session()
+    local session = read_current_session()
+    if session ~= nil then
         msg.debug("refreshing current session", cur_session)
-        sessions[cur_session] = read_current_session()
+        sessions[cur_session] = session
     end
 end
 
@@ -323,7 +329,7 @@ local function sessions_save(file)
 end
 
 local function save_sessions(file)
-    refresh_session()
+    update_session()
     sessions_save(file)
 end
 
@@ -358,7 +364,7 @@ end
 local function session_attach(session_index, load_playlist, maintain_pos)
     local session = index_session(session_index)
     if session ~= nil and #session > 0 then
-        refresh_session()
+        update_session()
         msg.debug('session with', #session - 1, "videos")
         local playlist = {}
         local pos = 0
@@ -390,7 +396,7 @@ local function session_attach(session_index, load_playlist, maintain_pos)
             -- mpv uses 0 based array indices, but lua uses 1-based
             mp.commandv('loadfile', playlist[pos + 1])
         end
-        set_session(session_index)
+        set_current_session(session_index)
     end
 end
 
@@ -399,7 +405,7 @@ end
 -- @param disable_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback
 -- @param saving A bool, indicates whether to run save_sessions before loading the new session
 local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
-    refresh_session()
+    update_session()
     mp.unregister_event(save_hook)
     mp.register_event("shutdown", function()
         if o.auto_save then sessions_save() end
@@ -535,14 +541,63 @@ local function restart_mpv(disable_watch_later, saving)
     session_load(session_index, disable_watch_later, saving, true, true, args)
 end
 
--- intializing sessions, prepare old_session and cur_session
-read_history_sessions()
+-- intializing session start by open mpv, prepare old_session and cur_session
+local function initialize_open()
+    msg.debug("reading current playlist")
+    local session = read_current_session()
+    -- intialize session by adding current session or reloading previous session
+    if session ~= nil then
+        msg.debug("initializing by adding current playlist")
+        -- for session with playlist, add it into the first
+        local function read_hook()
+            if not o.allow_duplicated_session then
+                local matches = match_session(session)
+                for _, i in ipairs(matches) do
+                    msg.debug('removing session', i, 'since duplication')
+                    table.remove(sessions, i)
+                end
+            end
+            if #sessions == o.max_sessions then
+                msg.debug('removing last session')
+                table.remove(sessions)
+            end
+            table.insert(sessions, 1, session)
+            set_current_session(1)
+            msg.debug("unregistering read_hook")
+            mp.unregister_event(read_hook)
+        end
+        mp.register_event("file-loaded", read_hook)
+        -- for empty session
+    elseif o.auto_load then
+        msg.debug("initializing by loading previous session")
+        if not o.restore_empty and old_session == 0 then
+            old_session = 1
+        end
+        if old_session > 0 then
+            --Load the previous session if auto_load is enabled and the playlist is empty
+            --the function is not called until the first property observation is triggered to let everything initialise
+            --otherwise modifying playlist-start becomes unreliable
+            local function load_hook()
+                load_session(old_session, false, false)
+                msg.debug("unregistering load_hook")
+                mp.unobserve_property(load_hook)
+            end
+            mp.observe_property("idle", "string", load_hook)
+        else
+            set_current_session(0)
+            msg.debug("nothing to do, since previous session is empty")
+        end
+    else
+        msg.debug("initializing by loading previous session")
+        set_current_session(0)
+    end
+end
 
-if o.__by_loading__ then
-    msg.debug("found session created by `session_load`, skip intializing")
+local function initialize_load()
+    msg.debug("intializing session created by `session_load`")
     local function session_load_set()
         local session_index = tonumber(o.__by_loading__)
-        set_session(session_index) -- for session_load
+        set_current_session(session_index) -- for session_load
     end
     if not empty_session() then
         local function session_load_hook()
@@ -559,52 +614,18 @@ if o.__by_loading__ then
         end
         mp.observe_property("idle", "string", session_load_hook)
     end
-else
-    -- intialize session by adding current session or reloading previous session
-    if not empty_session() then
-        -- if current playlist is not from load_session, add it into the first
-        msg.debug("reading current playlist")
-        local function read_hook()
-            local session = read_current_session()
-            if session ~= nil then
-                if not o.allow_duplicated_session then
-                    local matches = match_session(session)
-                    for _, i in ipairs(matches) do
-                        msg.debug('removing session', i, 'since duplication')
-                        table.remove(sessions, i)
-                    end
-                end
-                if #sessions == o.max_sessions then
-                    msg.debug('removing last session')
-                    table.remove(sessions)
-                end
-                table.insert(sessions, 1, session)
-                set_session(1)
-            end
-            msg.debug("unregistering read_hook")
-            mp.unregister_event(read_hook)
-        end
-        mp.register_event("file-loaded", read_hook)
-    elseif o.auto_load then
-        msg.debug("loading previous session")
-        if not o.restore_empty and old_session == 0 then
-            old_session = 1
-        end
-        if old_session > 0 then
-            --Load the previous session if auto_load is enabled and the playlist is empty
-            --the function is not called until the first property observation is triggered to let everything initialise
-            --otherwise modifying playlist-start becomes unreliable
-            local function load_hook()
-                load_session(old_session, false, false)
-                msg.debug("unregistering load_hook")
-                mp.unobserve_property(load_hook)
-            end
-            mp.observe_property("idle", "string", load_hook)
-        else
-            msg.debug("nothing to do, since previous session is empty")
-        end
+end
+
+local function intializing()
+    read_history_sessions()
+    if o.__by_loading__ then
+        initialize_load()
+    else
+        initialize_open()
     end
 end
+
+intializing()
 
 -- define uosc menu ----------------------------------------
 local function command(str)
@@ -628,6 +649,7 @@ local function session_menu_add_file(menu, session, session_index)
 end
 
 local function sessions_menu()
+    update_session()
     local menu = {
         type = 'sessions',
         title = 'Playlist',
