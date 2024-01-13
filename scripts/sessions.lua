@@ -601,21 +601,21 @@ end
 
 local function initialize_load()
     msg.debug("intializing session created by `session_load`")
-    local function session_load_set()
+    local function session_load_index()
         local session_index = tonumber(o.__by_loading__)
         set_current_index(session_index) -- for session_load
         update_session_pos()
     end
     if not empty_session() then
         local function session_load_hook()
-            session_load_set()
+            session_load_index()
             msg.debug("unregistering session_load_hook")
             mp.unregister_event(session_load_hook)
         end
         mp.register_event("file-loaded", session_load_hook)
     else
         local function session_load_hook()
-            session_load_set()
+            session_load_index()
             msg.debug("unregistering session_load_hook")
             mp.unobserve_property(session_load_hook)
         end
