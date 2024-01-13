@@ -254,7 +254,7 @@ local function read_history_sessions(file)
 end
 
 -- We should always check if current session is empty (empty_session()) before reading current session
--- since we use cur_session = 0 indicates empty session and index_sessioon for zero always return nil 
+-- since we use cur_session = 0 indicates empty session and index_sessioon for zero always return nil
 -- return: current session table
 local function read_current_session()
     local session = {}
@@ -288,7 +288,7 @@ local function update_current_index(session_index)
 end
 
 -- helper function to change the first item of session after switching with session_attach, initialize_load
--- always update current index firstly before update playlist-pos. 
+-- always update current index firstly before update playlist-pos.
 local function update_session_pos()
     if cur_session > 0 then
         sessions[cur_session][1] = mp.get_property_number("playlist-pos")
@@ -639,8 +639,11 @@ local function session_menu_add_file(menu, session, session_index)
         -- the first one should be the orginal session start point, not the playlist
         position = position - 1
         if position > 0 then
+            local file_nm = tostring(v)
+            -- remove trailing / or \\
+            file_nm = string.gsub(file_nm, "[\\/]+$", "")
             table.insert(menu, {
-                title = string.match(tostring(v), "([^\\]+)$"),
+                title = string.match(file_nm, "([^\\/]+)$"),
                 hint = tostring(position),
                 active = session_index == cur_session and active_position == position,
                 value = command("sessions-set-video " .. position .. " " .. session_index)
