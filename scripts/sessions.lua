@@ -190,18 +190,6 @@ o.__by_loading__ = mp.get_opt(script_name .. "-__by_loading__")
 msg.debug("getting option __by_loading__:", o.__by_loading__)
 o.__by_loading__ = set_default(o.__by_loading__, false)
 
--- helper function to change `cur_session`
--- 1. when switching session: session_attach, initialize_load
--- 2. when open new windows: initialize_open
-local function set_current_session(session_index)
-    msg.debug('setting session index:', session_index)
-    cur_session = session_index
-    if cur_session > 0 then
-        sessions[cur_session][1] = mp.get_property_number("playlist-pos")
-    end
-    mp.osd_message("Session " .. cur_session .. "/" .. #sessions)
-end
-
 -- turns the session_file into a table and adds all the files to the playlist
 -- return: adverse effect, modify global variable: sessions.
 local function read_history_sessions(file)
@@ -292,6 +280,24 @@ local function read_current_session()
     return session
 end
 
+-- helper function to change `cur_session`
+-- 1. when switching session: session_attach, initialize_load
+-- 2. when open new windows: initialize_open
+local function set_current_index(session_index)
+    msg.debug('setting session index:', session_index)
+    cur_session = session_index
+    mp.osd_message("Session " .. cur_session .. "/" .. #sessions)
+end
+
+-- helper function to change the first item of current session
+-- 1. when switching session: session_attach, initialize_load
+-- 2. when open new windows: initialize_open
+local function update_session_pos()
+    if cur_session > 0 then
+        sessions[cur_session][1] = mp.get_property_number("playlist-pos")
+    end
+end
+
 -- refresh current session
 -- 1. when exit: save_hook
 -- 2. when switch session: session_attach, session_load
@@ -301,6 +307,8 @@ local function update_session()
     if session ~= nil then
         msg.debug("refreshing current session", cur_session)
         sessions[cur_session] = session
+    else
+        cur_session = 0
     end
 end
 
@@ -309,11 +317,7 @@ local function sessions_save(file)
     local oo = io.open(file, 'w')
     if not oo then return msg.error("Failed to write to file", file) end
     msg.debug('saving sessions to', file)
-    if empty_session() then
-        oo:write("OldSession=" .. 0 .. "\n")
-    else
-        oo:write("OldSession=" .. cur_session .. "\n")
-    end
+    oo:write("OldSession=" .. cur_session .. "\n")
     for _, session in ipairs(sessions) do
         oo:write("[playlist]\n")
         for i, v in ipairs(session) do
@@ -395,7 +399,8 @@ local function session_attach(session_index, load_playlist, maintain_pos)
             -- mpv uses 0 based array indices, but lua uses 1-based
             mp.commandv('loadfile', playlist[pos + 1])
         end
-        set_current_session(session_index)
+        set_current_index(session_index)
+        update_session_pos()
     end
 end
 
@@ -563,7 +568,7 @@ local function initialize_open()
                 table.remove(sessions)
             end
             table.insert(sessions, 1, session)
-            set_current_session(1)
+            set_current_index(1)
             msg.debug("unregistering read_hook")
             mp.unregister_event(read_hook)
         end
@@ -585,12 +590,12 @@ local function initialize_open()
             end
             mp.observe_property("idle", "string", load_hook)
         else
-            set_current_session(0)
+            set_current_index(0)
             msg.debug("nothing to do, since previous session is empty")
         end
     else
         msg.debug("initializing by loading previous session")
-        set_current_session(0)
+        set_current_index(0)
     end
 end
 
@@ -598,7 +603,8 @@ local function initialize_load()
     msg.debug("intializing session created by `session_load`")
     local function session_load_set()
         local session_index = tonumber(o.__by_loading__)
-        set_current_session(session_index) -- for session_load
+        set_current_index(session_index) -- for session_load
+        update_session_pos()
     end
     if not empty_session() then
         local function session_load_hook()
@@ -625,8 +631,6 @@ local function intializing()
         initialize_open()
     end
 end
-
-intializing()
 
 -- define uosc menu ----------------------------------------
 local function command(str)
@@ -735,6 +739,8 @@ local function open_menu()
     local json = utils.format_json(sessions_menu())
     mp.commandv('script-message-to', 'uosc', 'open-menu', json)
 end
+
+intializing()
 
 -- expose functions
 mp.register_script_message('save-session', save_sessions)
