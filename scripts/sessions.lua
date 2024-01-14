@@ -408,10 +408,8 @@ end
 -- @param saving A bool, indicates whether to run `sessions_save` before loading the new session
 local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
     refresh_session()
-    if set_default(saving, o.auto_save) then
-        mp.unregister_event(save_sessions)
-        mp.register_event("shutdown", sessions_save)
-    end
+    if o.auto_save then mp.unregister_event(save_sessions) end
+    if set_default(saving, o.auto_save) then mp.register_event("shutdown", sessions_save) end
     local session = index_session(session_index)
     local session_args = {
         o.mpv_bin,
