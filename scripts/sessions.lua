@@ -273,8 +273,8 @@ local function read_current_session()
         --if the file is available then it attempts to expand the path in-case of relative playlists
         --presumably if the file contains a protocol then it shouldn't be expanded
         if not v.filename:find("^%a*://") then
-            v.filename = utils.join_path(working_directory, v.filename)
             msg.debug('expanded path:', v.filename)
+            v.filename = utils.join_path(working_directory, v.filename)
         end
         table.insert(session, v.filename)
     end
@@ -337,11 +337,6 @@ local function save_sessions(file)
     sessions_save(file)
 end
 
-local function save_hook()
-    if o.auto_save then save_sessions() end
-end
-mp.register_event("shutdown", save_hook)
-
 -- mpv use 0-based index
 local function check_position(maintain_pos, pos)
     if maintain_pos == nil then maintain_pos = o.maintain_pos end
@@ -394,7 +389,7 @@ local function session_attach(session_index, load_playlist, maintain_pos)
             end
             if mp.get_property_number("playlist-pos") ~= pos then
                 msg.debug('setting playlist-pos:', pos)
-                mp.set_property('playlist-pos', pos)
+                mp.set_property_number('playlist-pos', pos)
             end
         else
             -- mpv uses 0 based array indices, but lua uses 1-based
@@ -411,10 +406,10 @@ end
 -- @param saving A bool, indicates whether to run save_sessions before loading the new session
 local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
     refresh_session()
-    mp.unregister_event(save_hook)
-    mp.register_event("shutdown", function()
-        if o.auto_save then sessions_save() end
-    end)
+    if o.auto_save then
+        mp.unregister_event(save_sessions)
+        mp.register_event("shutdown", sessions_save)
+    end
     local session = index_session(session_index)
     local session_args = {
         o.mpv_bin,
@@ -732,7 +727,7 @@ local function open_menu()
         video_index = tonumber(video_index)
         if session_index == cur_session then
             -- mpv use 0-based index but sessions-script and lua use 1-based index
-            mp.set_property('playlist-pos', video_index - 1)
+            mp.set_property_number('playlist-pos', video_index - 1)
         else
             if o.switch_action == "load" then
                 session_load(session_index, false, true, true, video_index)
@@ -746,6 +741,16 @@ local function open_menu()
 end
 
 intializing()
+if o.auto_save then mp.register_event("shutdown", save_sessions) end
+if mp.get_property("save-position-on-quit") then
+    msg.debug("detecting save-position-on-quit, will automatically delete watch later config when file finished")
+    mp.register_event("end-file", function(event)
+        if event["reason"] == "eof" then
+            msg.debug("file ended, delete watch later")
+            mp.command("delete-watch-later-config")
+        end
+    end)
+end
 
 -- expose functions
 mp.register_script_message('save-session', save_sessions)
