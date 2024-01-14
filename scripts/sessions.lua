@@ -106,9 +106,9 @@ local function set_default(x, default)
 end
 
 local function check_bool(arg, default)
-    if arg == 'yes' or arg == true then
+    if arg == 'yes' or arg == 'true' or arg == true then
         return true
-    elseif arg == 'no' or arg == false then
+    elseif arg == 'no' or arg == 'false' or arg == false then
         return false
     else
         return default
@@ -344,9 +344,9 @@ local function save_hook() save_sessions() end
 -- pos: mpv api, 0-based index
 local function check_position(maintain_pos, pos)
     if maintain_pos == nil then maintain_pos = o.maintain_pos end
-    if maintain_pos == 'yes' or maintain_pos == true then
+    if maintain_pos == 'yes' or maintain_pos == 'true' or maintain_pos == true then
         return pos
-    elseif maintain_pos == 'no' or maintain_pos == false then
+    elseif maintain_pos == 'no' or maintain_pos == 'false' or maintain_pos == false then
         return 0
     else
         maintain_pos = tonumber(maintain_pos)
@@ -411,7 +411,7 @@ end
 local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
     refresh_session()
     if o.auto_save then mp.unregister_event(save_hook) end
-    if set_default(saving, o.auto_save) then
+    if check_bool(saving, o.auto_save) then
         mp.register_event("shutdown", function() sessions_save() end)
     end
     local session = index_session(session_index)
