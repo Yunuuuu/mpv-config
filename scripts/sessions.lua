@@ -92,7 +92,8 @@ local o = {
 script_name = mp.get_script_name()
 sessions = {}
 cur_session = 0 -- 0 means empty session
-old_session = 0 -- 0 means empty session
+-- old_session should be the last non-empty session index
+old_session = 1 -- 0 means empty session
 
 
 -- utils function --------------------------------------
@@ -207,7 +208,9 @@ local function read_history_sessions(file)
     -- read session index firstly
     msg.debug('reading session index')
     -- if zero, means last session is empty
-    old_session = tonumber(string.match(oo:read(), '^OldSession=(%d+)$')) or 0
+    local session_index = oo:read()
+    old_session = tonumber(string.match(session_index, '^(%d+):%d+$')) or old_session
+    cur_session = tonumber(string.match(session_index, '^%d+:(%d+)$')) or cur_session
 
     local session
     local wait_position = true
@@ -283,6 +286,8 @@ end
 -- 2. when open new windows: initialize_open
 local function update_current_index(session_index)
     msg.debug('setting session index:', session_index)
+    -- save the last non-empty session index
+    if cur_session ~= 0 then old_session = cur_session end
     cur_session = session_index
     mp.osd_message("Session " .. cur_session .. "/" .. #sessions)
 end
@@ -304,7 +309,7 @@ local function refresh_session()
         msg.debug("refreshing current session", cur_session)
         sessions[cur_session] = read_current_session()
     else
-        cur_session = 0
+        update_current_index(0)
     end
 end
 
@@ -313,7 +318,7 @@ local function sessions_save(file)
     local oo = io.open(file, 'w')
     if not oo then return msg.error("Failed to write to file", file) end
     msg.debug('saving sessions to', file)
-    oo:write("OldSession=" .. cur_session .. "\n")
+    oo:write(old_session .. ":" .. cur_session .. "\n")
     for _, session in ipairs(sessions) do
         oo:write("[playlist]\n")
         for i, v in ipairs(session) do
@@ -572,22 +577,23 @@ local function initialize_open()
         -- for empty session
     elseif o.auto_load then
         msg.debug("initializing by loading previous session")
-        if not o.restore_empty and old_session == 0 then
-            old_session = 1
+        if not o.restore_empty and cur_session == 0 then
+            -- old_session should be the last non-empty session index
+            cur_session = old_session
         end
-        if old_session > 0 then
+        if cur_session > 0 then
             -- Load the previous session if auto_load is enabled and the playlist is empty
             -- the function is not called until the first property observation is triggered to let everything initialise
             -- otherwise modifying playlist-start becomes unreliable
             local function load_hook()
-                load_session(old_session, false, false)
+                load_session(cur_session, false, false)
                 msg.debug("unregistering load_hook")
                 mp.unobserve_property(load_hook)
             end
             mp.observe_property("idle", "string", load_hook)
         else
-            update_current_index(0)
             msg.debug("nothing to do, since previous session is empty")
+            update_current_index(0)
         end
     else
         msg.debug("initializing by loading previous session")
