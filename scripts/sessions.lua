@@ -403,10 +403,10 @@ end
 -- will start a new mpv process with the specified session playlist
 -- session can be nil, which indicates empty session
 -- @param disable_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback
--- @param saving A bool, indicates whether to run save_sessions before loading the new session
+-- @param saving A bool, indicates whether to run `sessions_save` before loading the new session
 local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
     refresh_session()
-    if o.auto_save then
+    if set_default(saving, o.auto_save) then
         mp.unregister_event(save_sessions)
         mp.register_event("shutdown", sessions_save)
     end
@@ -730,7 +730,7 @@ local function open_menu()
             mp.set_property_number('playlist-pos', video_index - 1)
         else
             if o.switch_action == "load" then
-                session_load(session_index, false, true, true, video_index)
+                session_load(session_index, false, nil, true, video_index)
             else
                 session_attach(session_index, true, video_index)
             end
