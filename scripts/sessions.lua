@@ -77,7 +77,7 @@ local o = {
     maintain_pos = true,
 
     -- if previous session is empty, but we do have history sessions, should the empty playlist be restored?
-    -- this occur if you quit manually with stop command.
+    -- this occur if you quit manually with the `stop` command.
     restore_empty = true,
 
     -- the default action to switch video via uosc menu, "attach-session" (attach_session or attach)
@@ -257,7 +257,7 @@ local function read_history_sessions(file)
 end
 
 -- We should always check if current session is empty (empty_session()) before reading current session
--- since we use cur_session = 0 indicates empty session and index_sessioon for zero always return nil
+-- We use cur_session = 0 indicates empty session and `index_session` function for zero always return `nil`
 -- return: current session table
 local function read_current_session()
     local session = {}
@@ -313,6 +313,7 @@ local function refresh_session()
     end
 end
 
+-- always remember to refresh current session before running `sessions_save`
 local function sessions_save(file)
     file = set_default(file, o.session_file)
     local oo = io.open(file, 'w')
@@ -337,7 +338,8 @@ local function save_sessions(file)
     sessions_save(file)
 end
 
--- mpv use 0-based index
+-- maintain_pos: user api, 1-based index
+-- pos: mpv api, 0-based index
 local function check_position(maintain_pos, pos)
     if maintain_pos == nil then maintain_pos = o.maintain_pos end
     if maintain_pos == 'yes' or maintain_pos == true then
@@ -581,7 +583,7 @@ local function initialize_open()
             -- the function is not called until the first property observation is triggered to let everything initialise
             -- otherwise modifying playlist-start becomes unreliable
             local function load_hook()
-                load_session(cur_session, false, false)
+                load_session(cur_session, false, nil)
                 msg.debug("unregistering load_hook")
                 mp.unobserve_property(load_hook)
             end
@@ -622,6 +624,7 @@ end
 
 local function intializing()
     read_history_sessions()
+    if o.auto_save then mp.register_event("shutdown", save_sessions) end
     if o.__by_loading__ then
         initialize_load()
     else
@@ -665,16 +668,16 @@ local function sessions_menu()
     -- add previous session playlist
     local prev_session_index = cur_session + 1
     local prev_session = index_session(prev_session_index)
-    if prev_session ~= nil then
+    if prev_session then
         msg.debug('adding previous session playlist from session', prev_session_index .. ",", #prev_session - 1, "files")
         local previous_sessions_menu = {}
         table.insert(menu.items, { title = "Previous Session", hint = "", items = previous_sessions_menu })
         local session_index = prev_session_index + 1
         local session = index_session(session_index)
-        if session ~= nil then
+        if session then
             local history_menu = {}
             table.insert(previous_sessions_menu, { title = "History", hint = "", items = history_menu })
-            while session ~= nil do
+            while session do
                 local session_menu = {}
                 table.insert(history_menu, { title = "Session " .. session_index, hint = "", items = session_menu })
                 session_menu_add_file(session_menu, session, session_index)
@@ -688,16 +691,16 @@ local function sessions_menu()
     -- add next session playlist
     local next_session_index = cur_session - 1
     local next_session = index_session(next_session_index)
-    if next_session ~= nil then
+    if next_session then
         msg.debug('adding next session playlist from session', next_session_index .. ",", #next_session - 1, "files")
         local next_sessions_menu = {}
         table.insert(menu.items, { title = "Next Session", hint = "", items = next_sessions_menu })
         local session_index = next_session_index - 1
         local session = index_session(session_index)
-        if session ~= nil then
+        if session then
             local future_menu = {}
-            table.insert(next_sessions_menu, { title = "Time machine", hint = "", items = future_menu, align = "right" })
-            while session ~= nil do
+            table.insert(next_sessions_menu, { title = "Future History", hint = "", items = future_menu })
+            while session do
                 local session_menu = {}
                 table.insert(future_menu, { title = "Session " .. session_index, hint = "", items = session_menu })
                 session_menu_add_file(session_menu, session, session_index)
@@ -740,19 +743,10 @@ local function open_menu()
     mp.commandv('script-message-to', 'uosc', 'open-menu', json)
 end
 
+-- intializing script -----------------------------------------
 intializing()
-if o.auto_save then mp.register_event("shutdown", save_sessions) end
-if mp.get_property("save-position-on-quit") then
-    msg.debug("detecting save-position-on-quit, will automatically delete watch later config when file finished")
-    mp.register_event("end-file", function(event)
-        if event["reason"] == "eof" then
-            msg.debug("file ended, delete watch later")
-            mp.command("delete-watch-later-config")
-        end
-    end)
-end
 
--- expose functions
+-- expose functions -------------------------------------------
 mp.register_script_message('save-session', save_sessions)
 mp.register_script_message('load-session', load_session)
 mp.register_script_message('attach-session', attach_session)
