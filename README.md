@@ -27,7 +27,13 @@ cd ~/scoop/persist/mpv/portable_config
 git clone https://github.com/Yunuuuu/mpv-config .
 ```
 
-## Credits
+## Scripts
+
+[Yunuuuu/mpv-config](https://github.com/Yunuuuu/mpv-config)
+
+- pause_replay.lua
+- add_video_rotate.lua
+- sessions.lua
 
 [tomasklaen/uosc](https://github.com/tomasklaen/uosc)
 
@@ -37,15 +43,9 @@ git clone https://github.com/Yunuuuu/mpv-config .
 
 - thumbfast.lua
 
-[mpv-player/mpv](https://github.com/mpv-player/mpv/TOOLS/lua/autoload.lua)
+[mpv-player/mpv](https://github.com/mpv-player/mpv/TOOLS/lua/)
 
 - autoload.lua
-
-[Yunuuuu/mpv-config](https://github.com/Yunuuuu/mpv-config)
-
-- pause_replay.lua
-- add_video_rotate.lua
-- sessions.lua
 
 [Hill-98/mpv-config](https://github.com/Hill-98/mpv-config)
 
@@ -54,6 +54,8 @@ git clone https://github.com/Yunuuuu/mpv-config .
 [AN3223/dotfiles](https://github.com/AN3223/dotfiles)
 
 - pickshader.lua
+
+## Shaders
 
 [bjin/mpv-prescalers](https://github.com/bjin/mpv-prescalers/tree/master/gather)
 
