@@ -89,12 +89,11 @@ local o = {
 }
 
 -- prepare global variables ----------------------------
-script_name = mp.get_script_name()
-sessions = {}
-cur_session = 0 -- 0 means empty session
+local script_name = mp.get_script_name()
+local sessions = {}
+local cur_session = 0 -- 0 means empty session
 -- old_session should be the last non-empty session index
-old_session = 1 -- 0 means empty session
-
+local old_session = 1
 
 -- utils function --------------------------------------
 local function set_default(x, default)
@@ -135,10 +134,7 @@ local function check_session_index(i)
     return i
 end
 
--- internal api
-local function index_session(i)
-    return sessions[i]
-end
+local function index_session(i) return sessions[i] end
 
 local function empty_session()
     return mp.get_property_number('playlist-count', 0) == 0
@@ -163,6 +159,7 @@ if o.switch_action == "load-session" or o.switch_action == "load_session" or o.s
 else
     o.switch_action = "attach"
 end
+
 o.auto_save = check_bool(o.auto_save, true)
 o.auto_load = check_bool(o.auto_load, true)
 o.load_playlist = check_bool(o.load_playlist, true)
@@ -257,8 +254,9 @@ local function read_history_sessions(file)
 end
 
 -- We should always check if current session is empty (empty_session()) before reading current session
--- We use cur_session = 0 indicates empty session and `index_session` function for zero always return `nil`
--- return: current session table
+-- We use session index of 0 to indicate empty session
+-- `index_session` function for zero always return `nil`
+-- return: A table
 local function read_current_session()
     local session = {}
     -- mpv uses 0 based array indices, but lua uses 1-based
@@ -304,7 +302,7 @@ end
 -- 1. when exit: save_hook
 -- 2. when switch session: session_attach, session_load
 -- 3. when query uosc menu
-local function refresh_session()
+local function update_current_session()
     if not empty_session() then
         msg.debug("refreshing current session", cur_session)
         sessions[cur_session] = read_current_session()
@@ -334,7 +332,7 @@ local function sessions_save(file)
 end
 
 local function save_sessions(file)
-    refresh_session()
+    update_current_session()
     sessions_save(file)
 end
 
@@ -367,7 +365,7 @@ end
 local function session_attach(session_index, load_playlist, maintain_pos)
     local session = index_session(session_index)
     if session ~= nil and #session > 0 then
-        refresh_session()
+        update_current_session()
         msg.debug('session with', #session - 1, "videos")
         local playlist = {}
         local pos = 0
@@ -409,7 +407,7 @@ end
 -- @param disable_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback
 -- @param saving A bool, indicates whether to run `sessions_save` before loading the new session
 local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
-    refresh_session()
+    update_current_session()
     if o.auto_save then mp.unregister_event(save_hook) end
     if check_bool(saving, o.auto_save) then
         mp.register_event("shutdown", function() sessions_save() end)
@@ -659,7 +657,6 @@ local function session_menu_add_file(menu, session, session_index)
 end
 
 local function sessions_menu()
-    refresh_session()
     local menu = {
         type = 'sessions',
         title = 'Playlist',
@@ -741,6 +738,8 @@ local function open_menu()
             end
         end
     end)
+    -- always update current session data when open menu
+    update_current_session()
     local json = utils.format_json(sessions_menu())
     mp.commandv('script-message-to', 'uosc', 'open-menu', json)
 end
