@@ -338,6 +338,8 @@ local function save_sessions(file)
     sessions_save(file)
 end
 
+local function save_hook() save_sessions() end
+
 -- maintain_pos: user api, 1-based index
 -- pos: mpv api, 0-based index
 local function check_position(maintain_pos, pos)
@@ -408,8 +410,10 @@ end
 -- @param saving A bool, indicates whether to run `sessions_save` before loading the new session
 local function session_load(session_index, disable_watch_later, saving, load_playlist, maintain_pos, args)
     refresh_session()
-    if o.auto_save then mp.unregister_event(save_sessions) end
-    if set_default(saving, o.auto_save) then mp.register_event("shutdown", sessions_save) end
+    if o.auto_save then mp.unregister_event(save_hook) end
+    if set_default(saving, o.auto_save) then
+        mp.register_event("shutdown", function() sessions_save() end)
+    end
     local session = index_session(session_index)
     local session_args = {
         o.mpv_bin,
@@ -622,7 +626,7 @@ end
 
 local function intializing()
     read_history_sessions()
-    if o.auto_save then mp.register_event("shutdown", save_sessions) end
+    if o.auto_save then mp.register_event("shutdown", save_hook) end
     if o.__by_loading__ then
         initialize_load()
     else
