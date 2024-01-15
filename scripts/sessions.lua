@@ -141,8 +141,6 @@ local function check_session_index(i)
     return i
 end
 
-local function index_session(i) return sessions[i] end
-
 local function empty_session()
     return mp.get_property_number('playlist-count', 0) == 0
 end
@@ -265,7 +263,6 @@ end
 -- 1. We should always check if current session is empty (empty_session()) before reading current session 
 --    since we don't want to save empty session
 -- 2. We use session index of 0 to indicate empty session
--- 3. `index_session` function for zero always return `nil`
 -- return: A table
 local function read_current_session()
     local session = {}
@@ -374,7 +371,7 @@ end
 -- add the session playlist in current session, won't restart mpv process
 local function session_attach(session_index, load_playlist, maintain_pos)
     update_session()
-    local session = index_session(session_index)
+    local session = sessions[session_index]
     if session ~= nil then -- we don't allow blank session exist in global sessions
         msg.debug("attaching session with", #session, "videos")
         load_playlist = check_bool(load_playlist, o.load_playlist)
@@ -414,7 +411,7 @@ local function session_load(session_index, disable_watch_later, saving, load_pla
     update_session()
     if o.auto_save then mp.unregister_event(save_hook) end
     if check_bool(saving, o.auto_save) then mp.register_event("shutdown", function() sessions_save() end) end
-    local session = index_session(session_index)
+    local session = sessions[session_index]
     local session_args = {
         o.mpv_bin,
         -- __by_loading__ as a hook, we can set cur_session in the new opened mpv process
@@ -669,13 +666,13 @@ local function sessions_menu()
     msg.debug('menu: reading', #sessions, 'sessions')
     -- add previous session playlist
     local prev_session_index = cur_session + 1
-    local prev_session = index_session(prev_session_index)
+    local prev_session = sessions[prev_session_index]
     if prev_session then
         msg.debug('adding previous session playlist from session', prev_session_index .. ",", #prev_session, "files")
         local previous_sessions_menu = {}
         table.insert(menu.items, { title = "Previous Session", hint = "", items = previous_sessions_menu })
         local session_index = prev_session_index + 1
-        local session = index_session(session_index)
+        local session = sessions[session_index]
         if session then
             local history_menu = {}
             table.insert(previous_sessions_menu, { title = "History", hint = "", items = history_menu })
@@ -684,7 +681,7 @@ local function sessions_menu()
                 table.insert(history_menu, { title = "Session " .. session_index, hint = "", items = session_menu })
                 session_menu_add_file(session_menu, session, session_index)
                 session_index = session_index + 1
-                session = index_session(session_index)
+                session = sessions[session_index]
             end
         end
         session_menu_add_file(previous_sessions_menu, prev_session, prev_session_index)
@@ -692,13 +689,13 @@ local function sessions_menu()
 
     -- add next session playlist
     local next_session_index = cur_session - 1
-    local next_session = index_session(next_session_index)
+    local next_session = sessions[next_session_index]
     if next_session then
         msg.debug('adding next session playlist from session', next_session_index .. ",", #next_session, "files")
         local next_sessions_menu = {}
         table.insert(menu.items, { title = "Next Session", hint = "", items = next_sessions_menu })
         local session_index = next_session_index - 1
-        local session = index_session(session_index)
+        local session = sessions[session_index]
         if session then
             local future_menu = {}
             table.insert(next_sessions_menu, { title = "Future History", hint = "", items = future_menu })
@@ -707,7 +704,7 @@ local function sessions_menu()
                 table.insert(future_menu, { title = "Session " .. session_index, hint = "", items = session_menu })
                 session_menu_add_file(session_menu, session, session_index)
                 session_index = session_index - 1
-                session = index_session(session_index)
+                session = sessions[session_index]
             end
         end
         session_menu_add_file(next_sessions_menu, next_session, next_session_index)
@@ -715,7 +712,7 @@ local function sessions_menu()
 
     -- add current playlist
     msg.debug('adding current session playlist')
-    local session = index_session(cur_session)
+    local session = sessions[cur_session]
     if session then session_menu_add_file(menu.items, session, cur_session) end
     return menu
 end
