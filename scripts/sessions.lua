@@ -92,8 +92,8 @@ local o = {
 local script_name = mp.get_script_name()
 local sessions = {}
 local cur_session = 0 -- 0 means empty session
--- old_session should be the last non-empty session index
-local old_session = 1
+-- last_valid_session should be the last non-empty session index
+local last_valid_session = 1
 
 -- utils function --------------------------------------
 local function set_default(x, default)
@@ -213,7 +213,7 @@ local function read_history_sessions(file)
     msg.debug('reading session index')
     -- if zero, means last session is empty
     local session_index = oo:read()
-    old_session = tonumber(string.match(session_index, '^(%d+):%d+$')) or old_session
+    last_valid_session = tonumber(string.match(session_index, '^(%d+):%d+$')) or last_valid_session
     cur_session = tonumber(string.match(session_index, '^%d+:(%d+)$')) or cur_session
 
     local session
@@ -260,9 +260,12 @@ local function read_history_sessions(file)
     oo:close()
 end
 
--- We should always check if current session is empty (empty_session()) before reading current session
--- We use session index of 0 to indicate empty session
--- `index_session` function for zero always return `nil`
+
+-- Notes:
+-- 1. We should always check if current session is empty (empty_session()) before reading current session 
+--    since we don't want to save empty session
+-- 2. We use session index of 0 to indicate empty session
+-- 3. `index_session` function for zero always return `nil`
 -- return: A table
 local function read_current_session()
     local session = {}
@@ -286,15 +289,26 @@ local function read_current_session()
     return session
 end
 
+local function osd_session_index(session_index)
+    -- in the user osd, we should reverse `cur_sessiion`
+    -- if we have 5 sessions, and cur_session is 1, we should display 5
+    -- if cur_session is 2, we should display 4
+    local n = #sessions
+    if n > 1 and session_index > 0 then
+        session_index = (1 + n) - session_index
+    end
+    mp.osd_message("Session " .. session_index .. "/" .. n)
+end
+
 -- helper function to change `cur_session`
 -- 1. when switching session: session_attach, initialize_load
 -- 2. when open new windows: initialize_open
 local function update_session_index(session_index)
     msg.debug('setting session index:', session_index)
     -- save the last non-empty session index
-    if cur_session ~= 0 then old_session = cur_session end
+    if cur_session ~= 0 then last_valid_session = cur_session end
     cur_session = session_index
-    mp.osd_message("Session " .. cur_session .. "/" .. #sessions)
+    osd_session_index(session_index)
 end
 
 -- helper function to change the first item of session after switching with session_attach, initialize_load
@@ -324,7 +338,7 @@ local function sessions_save(file)
     local oo = io.open(file, 'w')
     if not oo then return msg.error("Failed to write to file", file) end
     msg.debug('saving sessions to', file)
-    oo:write(old_session .. ":" .. cur_session .. "\n")
+    oo:write(last_valid_session .. ":" .. cur_session .. "\n")
     for _, session in ipairs(sessions) do
         oo:write("[playlist]\n")
         oo:write(session["pos"] .. "\n")
@@ -530,7 +544,7 @@ local function restart_mpv(disable_watch_later, saving)
     session_load(session_index, disable_watch_later, saving, true, true, args)
 end
 
--- intializing session start when openning a new mpv window, prepare `old_session` and `cur_session`
+-- intializing session start when openning a new mpv window, prepare `last_valid_session` and `cur_session`
 local function initialize_open()
     -- intialize session by adding current session or reloading previous session
     if not empty_session() then
@@ -563,8 +577,8 @@ local function initialize_open()
         msg.debug("initializing by loading previous session")
         local session_index
         if not o.restore_empty and cur_session == 0 then
-            -- `old_session` is the last non-empty session index
-            session_index = old_session
+            -- `last_valid_session` is the last non-empty session index
+            session_index = last_valid_session
         else
             session_index = cur_session
         end
