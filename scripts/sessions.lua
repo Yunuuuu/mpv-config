@@ -260,7 +260,7 @@ end
 
 
 -- Notes:
--- 1. We should always check if current session is empty (empty_session()) before reading current session 
+-- 1. We should always check if current session is empty (empty_session()) before reading current session
 --    since we don't want to save empty session
 -- 2. We use session index of 0 to indicate empty session
 -- return: A table
@@ -286,6 +286,33 @@ local function read_current_session()
     return session
 end
 
+local function update_session_index(session_index)
+    msg.debug('updating session index:', session_index)
+    if cur_session ~= 0 then last_valid_session = cur_session end
+    cur_session = session_index
+end
+
+-- helper function to change the first item of session after switching with session_attach, initialize_load
+-- always update current index firstly before update playlist-pos.
+local function update_session_pos()
+    if cur_session > 0 then
+        sessions[cur_session]["pos"] = mp.get_property_number("playlist-pos")
+    end
+end
+
+-- refresh current session, for empty session, update session index
+-- 1. when exit: save_hook
+-- 2. when switch session: session_attach, session_load
+-- 3. when query uosc menu
+local function update_session()
+    if not empty_session() then
+        msg.debug("refreshing current session", cur_session)
+        sessions[cur_session] = read_current_session()
+    else
+        update_session_index(0)
+    end
+end
+
 local function osd_session_index(session_index)
     -- in the user osd, we should reverse `cur_sessiion`
     -- if we have 5 sessions, and cur_session is 1, we should display 5
@@ -297,36 +324,12 @@ local function osd_session_index(session_index)
     mp.osd_message("Session " .. session_index .. "/" .. n)
 end
 
--- helper function to change `cur_session`
+-- helper function to set `cur_session` and display osd message
 -- 1. when switching session: session_attach, initialize_load
 -- 2. when open new windows: initialize_open
-local function update_session_index(session_index)
-    msg.debug('setting session index:', session_index)
-    -- save the last non-empty session index
-    if cur_session ~= 0 then last_valid_session = cur_session end
-    cur_session = session_index
+local function set_session_index(session_index)
+    update_session_index(session_index)
     osd_session_index(session_index)
-end
-
--- helper function to change the first item of session after switching with session_attach, initialize_load
--- always update current index firstly before update playlist-pos.
-local function update_session_pos()
-    if cur_session > 0 then
-        sessions[cur_session]["pos"] = mp.get_property_number("playlist-pos")
-    end
-end
-
--- refresh current session, if necessary, update the session index for empty session
--- 1. when exit: save_hook
--- 2. when switch session: session_attach, session_load
--- 3. when query uosc menu
-local function update_session()
-    if not empty_session() then
-        msg.debug("refreshing current session", cur_session)
-        sessions[cur_session] = read_current_session()
-    else
-        update_session_index(0)
-    end
 end
 
 -- always remember to refresh current session before running `sessions_save`
@@ -394,12 +397,12 @@ local function session_attach(session_index, load_playlist, maintain_pos)
             -- mpv uses 0 based array indices, but lua uses 1-based
             mp.commandv('loadfile', session[pos + 1])
         end
-        update_session_index(session_index)
+        set_session_index(session_index)
         update_session_pos()
     else
         msg.debug("attaching empty session")
         mp.command("stop")
-        update_session_index(session_index)
+        set_session_index(session_index)
     end
 end
 
@@ -564,7 +567,7 @@ local function initialize_open()
                 table.remove(sessions)
             end
             table.insert(sessions, 1, session)
-            update_session_index(1)
+            set_session_index(1)
             msg.debug("unregistering read_hook")
             mp.unregister_event(read_hook)
         end
@@ -593,12 +596,12 @@ local function initialize_open()
             mp.observe_property("idle", "string", load_hook)
         else
             msg.debug("nothing to do, since previous session is empty")
-            update_session_index(0)
+            set_session_index(0)
             session_index = nil
         end
     else
         msg.debug("initializing by loading previous session")
-        update_session_index(0)
+        set_session_index(0)
     end
 end
 
@@ -606,7 +609,7 @@ local function initialize_load()
     msg.debug("intializing session created by `session_load`")
     local function session_load_index()
         local session_index = tonumber(o.__by_loading__)
-        update_session_index(session_index) -- for session_load
+        set_session_index(session_index) -- for session_load
         update_session_pos()
     end
     if not empty_session() then
