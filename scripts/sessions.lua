@@ -80,6 +80,12 @@ local o = {
     -- this occur if you quit manually with the `stop` command.
     restore_empty = true,
 
+    -- Check if files still exist, if it don't exist, hide it from the menu
+    hide_deleted = true,
+
+    -- Check if files still exist, if it don't exist, remove it from the session
+    remove_deleted = false,
+
     -- the default action to switch video via uosc menu, "session-attach" (session_attach or attach)
     -- or "session-load" (session_load or load)
     switch_action = "attach",
@@ -152,6 +158,24 @@ local function use_index(i)
     return i
 end
 
+local function file_exist(file)
+    if utils.file_info(file) then return true else return false end
+end
+
+local function initialize_session(pos)
+    local session = {}
+    session["pos"] = pos
+    return session
+end
+
+local function add_session_file(session, file)
+    if o.remove_deleted and not file_exist(file) then
+        return
+    end
+    msg.debug('adding file:', file)
+    table.insert(session, file)
+end
+
 -- return: A table of session index match provided session
 local function match_session(session)
     local value = table.concat(session, ";")
@@ -184,6 +208,8 @@ o.allow_duplicated_session = check_bool(o.allow_duplicated_session, false, "allo
 -- but we can directly pass a numeric argument in load_session or attach_session
 o.maintain_pos = check_bool(o.maintain_pos, true, "maintain_pos")
 o.restore_empty = check_bool(o.restore_empty, true, "restore_empty")
+o.remove_deleted = check_bool(o.remove_deleted, false, "remove_deleted")
+o.hide_deleted = check_bool(o.hide_deleted, true, "hide_deleted")
 o.mpv_bin = set_default(o.mpv_bin, "mpv")
 
 -- sets the default session file to the watch_later directory or ~~/watch_later/
@@ -251,14 +277,12 @@ local function read_history_sessions(file)
             -- the first one should be the position of current playlist
             local pos = tonumber(line)
             msg.debug('adding one session')
-            session = {}
             msg.debug('playlist position at', pos)
-            session["pos"] = pos
+            session = initialize_session(pos)
             wait_position = false
         else
             local file_path = string.match(line, 'File=(.+)')
-            msg.debug('adding file:', file_path)
-            table.insert(session, file_path)
+            add_session_file(session, file_path)
         end
     end
     msg.debug('imported', #sessions, 'sessions')
@@ -271,13 +295,12 @@ end
 -- 2. We use session index of 0 to indicate empty session
 -- return: A table
 local function read_current_session()
-    local session = {}
     -- mpv uses 0 based array indices, but lua uses 1-based
     local working_directory = mp.get_property('working-directory')
     local playlist = mp.get_property_native('playlist')
     local pos = mp.get_property_number("playlist-pos")
     msg.debug('playlist position at', pos)
-    session["pos"] = pos
+    local session = initialize_session(pos)
     for _, v in ipairs(playlist) do
         msg.debug('adding', v.filename, 'to playlist')
 
@@ -287,7 +310,7 @@ local function read_current_session()
             msg.debug('expanded path:', v.filename)
             v.filename = utils.join_path(working_directory, v.filename)
         end
-        table.insert(session, v.filename)
+        add_session_file(session, v.filename)
     end
     return session
 end
@@ -565,14 +588,31 @@ local function menu_add_file(menu, session, session_index)
     local active_position = mp.get_property_number("playlist-pos") + 1
     local active = session_index == current_session
     for position, v in ipairs(session) do
+        local submenu = {}
+        if not file_exist(v) then
+            if o.hide_deleted then
+                goto continue
+            else
+                submenu.hint = "deleted"
+                submenu.items = {}
+                table.insert(submenu.items, {
+                    type = script_name .. "_invalid_item",
+                    title = "remove",
+                    hint = "",
+                    active = false,
+                    keep_open = true,
+                    value = command("sessions-delete-video " .. position .. " " .. session_index)
+                })
+            end
+        else
+            submenu.hint = tostring(position)
+            submenu.value = command("sessions-set-video " .. position .. " " .. session_index)
+        end
         -- remove trailing / or \\ and keep the basename
-        local basename = string.match(string.gsub(v, "[\\/]+$", ""), "([^\\/]+)$")
-        table.insert(menu, {
-            title = basename,
-            hint = tostring(position),
-            active = active and active_position == position,
-            value = command("sessions-set-video " .. position .. " " .. session_index)
-        })
+        submenu.title = string.match(string.gsub(v, "[\\/]+$", ""), "([^\\/]+)$")
+        submenu.active = active and active_position == position
+        table.insert(menu, submenu)
+        ::continue::
     end
 end
 
@@ -581,7 +621,8 @@ local function load_menu()
         type = 'sessions',
         title = 'Playlist',
         keep_open = true,
-        items = {}
+        items = {},
+        on_close = command("sessions-close-menu")
     }
     msg.debug('menu: reading', #sessions, 'sessions')
     -- add previous session playlist
@@ -638,13 +679,24 @@ local function load_menu()
 end
 
 local function close_menu()
+    msg.debug("closing uosc menu; unregistering command")
     mp.unregister_script_message("sessions-set-video")
-    mp.commandv('script-message-to', 'uosc', 'close-menu', "sessions")
+    mp.unregister_script_message("sessions-delete-video")
+    mp.unregister_script_message("sessions-close-menu")
+end
+
+local function uosc_close_menu(type)
+    if type then
+        mp.commandv('script-message-to', 'uosc', 'close-menu', type)
+    else
+        mp.commandv('script-message-to', 'uosc', 'close-menu')
+    end
 end
 
 local function open_menu()
+    mp.register_script_message('sessions-close-menu', close_menu)
     mp.register_script_message('sessions-set-video', function(position, index)
-        close_menu()
+        uosc_close_menu()
         index = tonumber(index)
         position = tonumber(position)
         if index == current_session then
@@ -658,12 +710,27 @@ local function open_menu()
             end
         end
     end)
+    mp.register_script_message("sessions-delete-video", function(position, index)
+        uosc_close_menu(script_name .. "_invalid_item")
+        index = tonumber(index)
+        position = tonumber(position)
+        if position then
+            msg.debug("deleting item", position, "from session", index)
+            table.remove(sessions[index], position)
+            -- mpv use 0-based index
+            mp.commandv("playlist-remove", position - 1)
+            -- Update currently opened menu
+            local json = utils.format_json(load_menu())
+            mp.commandv('script-message-to', 'uosc', 'update-menu', json)
+        end
+    end)
     -- always update current session data when open menu
     refresh_session()
     local json = utils.format_json(load_menu())
     mp.commandv('script-message-to', 'uosc', 'open-menu', json)
 end
 
+-------------------------------------------------------------------------
 -- function to export for users -----------------------------------------
 local function define_prev()
     local index = current_session - 1
