@@ -80,8 +80,8 @@ local o = {
     -- this occur if you quit manually with the `stop` command.
     restore_empty = true,
 
-    -- the default action to switch video via uosc menu, "attach-session" (attach_session or attach)
-    -- or "load-session" (load_session or load)
+    -- the default action to switch video via uosc menu, "session-attach" (session_attach or attach)
+    -- or "session-load" (session_load or load)
     switch_action = "attach",
 
     -- the default execution of mpv, usage for session_restart
