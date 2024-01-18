@@ -1,17 +1,17 @@
 --[[
-    This script automatically saves the current playlist and can reload it if the player is started in idle mode (specifically
-    if there are 0 files in the playlist), or if the correct command is sent via script-messages.
-    It remembers the playlist position the player was in when shutdown and reloads the playlist at that entry.
-    This can be disabled with script-opts
+    Every playlist was regarded as a session, you can easily switch between different 
+    sessions with `session-attach` or `session-load`. This script automatically saves 
+    the current playlist when mpv exit (controlled via `auto_save` config) and can 
+    reload it if the player is started in idle mode (controlled via `auto_load` config). 
 
-    The script saves a text file containing the the full playlist of 5 sessions (can be changed by `max_sessions`) in the watch_later directory (changeable via opts)
+    The script saves a text file containing the the full playlist of 5 sessions
+    (can be changed by `max_sessions`) in the watch_later directory (changeable via opts)
     This file is saved in plaintext with the exact file paths of each playlist entry.
     Note that since it uses the same file, only the latest mpv window to be closed will be saved
 
-    The script attempts to correct relative playlist paths using the utils.join_path function. I've tried to automatically
-    detect when any non-files are loaded (if it has the sequence :// in the path), so that it'll work with URLs
-
-    You can disable the automatic stuff and use script messages to load/save playlists as well
+    The script attempts to correct relative playlist paths using the utils.join_path function.
+    I've tried to automatically detect when any non-files are loaded
+    (if it has the sequence :// in the path), so that it'll work with URLs
 
     save session in specified file, if nil, will use session_file in config file
     script-message sessions-save [session-file]
@@ -19,13 +19,14 @@
     session-load will start another mpv process
     @param no_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback, default: no
     @param saving A bool, indicates whether to run sessions_save before loading the new session
-    @param load_playlist A bool, indicates whether to run load whole playlist, if false, the file specified in
+    @param load_playlist A bool, indicates whether to load whole playlist, if false, the file specified in
            maintain_pos will be loaded. Default: use the script config option
     @param maintain_pos A bool or a number, indicates the start of the playlist, if true ("yes" can be okay),
            the original position will be used as the start point, if false ("no" will be the same), the first file
            of the playlist will be used as the start point. Default: use the script config option
-    @param resume_opts A list of options to load in the new mpv windows, see watch-later-options in <https://mpv.io/manual/master/#watch-later>.
-           this will independent on watch-later, I often use follow command to reset mpv but keep the start, volume, mute and pause state.
+    @param resume_opts A list of options to load in the new mpv windows, see watch-later-options in
+           <https://mpv.io/manual/master/#watch-later>. this will independent on watch-later,
+           I often use follow command to reset mpv but keep the start, volume, mute and pause state.
            `script-message-to sessions session-reload yes yes start,volume,mute,pause`
     script-message session-load [session-index] [no_watch_later] [saving] [load_playlist] [maintain_pos] [resume_opts]
     script-message session-reload [no_watch_later] [saving] [load_playlist] [maintain_pos] [resume_opts]
@@ -40,8 +41,6 @@
     script-message session-attach-next [load_playlist] [maintain_pos]
 
     If not included `session-file` will use the default file specified in script-opts.
-    `load_playlist` controls whether the whole playlist should be restored or just the one file,
-    the value can be `yes` or `no`. If not included it defaults to the value of the `load_playlist` script opt.
 
     modified from: https://github.com/CogentRedTester/mpv-scripts/blob/master/keep-session.lua
 ]]
