@@ -17,7 +17,7 @@
     script-message sessions-save [session-file]
 
     session-load will start another mpv process
-    @param no_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback, default: "no".
+    @param no_watch_later A bool, indicates whether to turn off watch later with --no-resume-playback, default: no
     @param saving A bool, indicates whether to run sessions_save before loading the new session
     @param load_playlist A bool, indicates whether to run load whole playlist, if false, the file specified in
            maintain_pos will be loaded. Default: use the script config option
@@ -443,8 +443,7 @@ local opt_to_property = {
 
 local function make_opt(x)
     msg.debug("preparing option:", x)
-    local property = opt_to_property[x]
-    if not property then property = x end
+    local property = opt_to_property[x] or x
     local value = mp.get_property(property)
     if value ~= nil and value ~= "" then
         return "--" .. x .. "=" .. value
@@ -609,11 +608,7 @@ end
 local function intializing()
     read_history_sessions()
     if o.auto_save then mp.register_event("shutdown", save_hook) end
-    if o.__by_loading__ then
-        initialize_load()
-    else
-        initialize_open()
-    end
+    if o.__by_loading__ then initialize_load() else initialize_open() end
 end
 
 -- define uosc menu ----------------------------------------
@@ -622,7 +617,7 @@ local function command(str)
 end
 
 local function menu_add_file(menu, session, session_index)
-    local active_position = mp.get_property_number("playlist-pos") + 1
+    local active_position = mp.get_property_number("playlist-pos-1")
     local active = session_index == current_session
     for position, v in ipairs(session) do
         local submenu = {}
@@ -797,7 +792,6 @@ end
 local function session_load(session_index, no_watch_later, saving, load_playlist, maintain_pos, resume_opts)
     local index = use_index(session_index)
     if index then
-        no_watch_later = check_bool(no_watch_later, false, "no_watch_later")
         load_session(index, no_watch_later, saving, load_playlist, maintain_pos, resume_opts)
     end
 end
@@ -805,7 +799,6 @@ end
 local function session_load_prev(no_watch_later, saving, load_playlist, maintain_pos, resume_opts)
     local index = define_prev()
     if index then
-        no_watch_later = check_bool(no_watch_later, false, "no_watch_later")
         load_session(index, no_watch_later, saving, load_playlist, maintain_pos, resume_opts)
     end
 end
@@ -813,7 +806,6 @@ end
 local function session_load_next(no_watch_later, saving, load_playlist, maintain_pos, resume_opts)
     local index = define_next()
     if index then
-        no_watch_later = check_bool(no_watch_later, false, "no_watch_later")
         load_session(index, no_watch_later, saving, load_playlist, maintain_pos, resume_opts)
     end
 end
@@ -827,9 +819,7 @@ end
 
 local function session_attach_next(load_playlist, maintain_pos)
     local index = define_next()
-    if index then
-        attach_session(index, load_playlist, maintain_pos)
-    end
+    if index then attach_session(index, load_playlist, maintain_pos) end
 end
 
 local function session_reload(no_watch_later, saving, resume_opts)
