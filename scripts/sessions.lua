@@ -659,7 +659,7 @@ local function load_menu()
         title = 'Playlist',
         keep_open = true,
         items = {},
-        on_close = command("sessions-close-menu")
+        on_close = command("on-close-menu")
     }
     msg.debug('menu: reading', #sessions, 'sessions')
     -- add previous session playlist
@@ -715,11 +715,11 @@ local function load_menu()
     return menu
 end
 
-local function close_menu()
-    msg.debug("closing uosc menu; unregistering command")
+local function on_close_menu()
+    msg.debug("closing uosc menu; unregistering menu command")
     mp.unregister_script_message("sessions-play-file")
     mp.unregister_script_message("sessions-delete-file")
-    mp.unregister_script_message("sessions-close-menu")
+    mp.unregister_script_message("on-close-menu")
 end
 
 local function uosc_close_menu(type)
@@ -731,8 +731,8 @@ local function uosc_close_menu(type)
 end
 
 local function open_menu()
-    mp.register_script_message('sessions-close-menu', close_menu)
-    mp.register_script_message('sessions-play-file', function(position, index)
+    mp.register_script_message("on-close-menu", on_close_menu)
+    mp.register_script_message("sessions-play-file", function(position, index)
         uosc_close_menu()
         index = tonumber(index)
         position = tonumber(position)
