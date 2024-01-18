@@ -1,8 +1,10 @@
 --[[
-    Every playlist was regarded as a session, you can easily switch between different 
-    sessions with `session-attach` or `session-load`. This script automatically saves 
-    the current playlist when mpv exit (controlled via `auto_save` config) and can 
-    reload it if the player is started in idle mode (controlled via `auto_load` config). 
+    Every playlist was regarded as a session, you can easily switch between different
+    sessions with `session-attach` or `session-load` (you can also switch file using uosc menu,
+    `sessions-open-menu`, the default keybinding for is "h", you can change it via `script-message-to`,
+    this is specifically used combine with uosc, you must intall it firstly to use the menu).
+    This script automatically saves the current playlist when mpv exit (controlled via `auto_save` config)
+    and can reload it if the player is started in idle mode (controlled via `auto_load` config).
 
     The script saves a text file containing the the full playlist of 5 sessions
     (can be changed by `max_sessions`) in the watch_later directory (changeable via opts)
