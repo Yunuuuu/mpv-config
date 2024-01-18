@@ -32,7 +32,7 @@ git clone https://github.com/Yunuuuu/mpv-config .
 [Yunuuuu/mpv-config](https://github.com/Yunuuuu/mpv-config)
 
 - pause_replay.lua
-- add_video_rotate.lua
+- rotate-video.lua
 - sessions.lua
 
 [tomasklaen/uosc](https://github.com/tomasklaen/uosc)
