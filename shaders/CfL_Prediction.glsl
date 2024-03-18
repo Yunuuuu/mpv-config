@@ -25,47 +25,12 @@
 //!BIND HOOKED
 //!SAVE LUMA_LOWRES
 //!WIDTH CHROMA.w
-//!HEIGHT LUMA.h
-//!WHEN CHROMA.w LUMA.w <
-//!DESC Chroma From Luma Prediction (Downscaling Luma 1st Step)
-
-vec4 hook() {
-    float factor = ceil(LUMA_size.x / HOOKED_size.x);
-    int start = int(ceil(-factor / 2.0 - 0.5));
-    int end = int(floor(factor / 2.0 - 0.5));
-
-    float output_luma = 0.0;
-    int wt = 0;
-    for (int dx = start; dx <= end; dx++) {
-        output_luma += LUMA_texOff(vec2(dx + 0.5, 0.0)).x;
-        wt++;
-    }
-    vec4 output_pix = vec4(output_luma / float(wt), 0.0, 0.0, 1.0);
-    return output_pix;
-}
-
-//!HOOK CHROMA
-//!BIND LUMA_LOWRES
-//!BIND HOOKED
-//!SAVE LUMA_LOWRES
-//!WIDTH CHROMA.w
 //!HEIGHT CHROMA.h
 //!WHEN CHROMA.w LUMA.w <
-//!DESC Chroma From Luma Prediction (Downscaling Luma 2nd Step)
+//!DESC Chroma From Luma Prediction (Downscaling Luma)
 
 vec4 hook() {
-    float factor = ceil(LUMA_LOWRES_size.y / HOOKED_size.y);
-    int start = int(ceil(-factor / 2.0 - 0.5));
-    int end = int(floor(factor / 2.0 - 0.5));
-
-    float output_luma = 0.0;
-    int wt = 0;
-    for (int dy = start; dy <= end; dy++) {
-        output_luma += LUMA_LOWRES_texOff(vec2(0.0, dy + 0.5)).x;
-        wt++;
-    }
-    vec4 output_pix = vec4(output_luma / float(wt), 0.0, 0.0, 1.0);
-    return output_pix;
+    return LUMA_texOff(0.0);
 }
 
 //!HOOK CHROMA
@@ -96,8 +61,8 @@ float comp_wd(vec2 v) {
 
 vec4 hook() {
     float ar_strength = 0.8;
-    vec2 mix_coeff = vec2(1.0);
-    vec2 corr_exponent = vec2(8.0);
+    vec2 mix_coeff = vec2(0.8);
+    vec2 corr_exponent = vec2(4.0);
 
     vec4 output_pix = vec4(0.0, 0.0, 0.0, 1.0);
     float luma_zero = LUMA_texOff(0.0).x;
