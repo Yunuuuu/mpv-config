@@ -28,7 +28,12 @@ else
     fi
 fi
 
-mkdir -p $to
+if [[ $to == */ ]]; then
+    mkdir -p $to
+else
+    mkdir -p $(dirname $to)
+fi
+
 cp $tmp/$from $to
 
 rm -rf $tmp
