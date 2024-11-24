@@ -361,7 +361,7 @@ local function save_sessions(file)
     file = set_default(file, o.session_file)
     local oo = io.open(file, 'w')
     if not oo then return msg.error("Failed to write to file", file) end
-    msg.debug('saving sessions (n:', #sessions, ')', "to", file)
+    msg.debug('saving sessions (n:', #sessions .. ") to", file)
     oo:write(last_valid_session .. ":" .. current_session .. "\n")
     for _, session in ipairs(sessions) do
         oo:write("[playlist]\n")
