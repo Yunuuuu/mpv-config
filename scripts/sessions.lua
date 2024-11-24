@@ -1,10 +1,10 @@
 --[[
     Every playlist was regarded as a session, you can easily switch between different
-    sessions with `session-attach` or `session-load` (you can also switch a file using 
-    `uosc` menu, which is the function `sessions-open-menu`, the default keybinding for 
-    it is "h", you can change it via `script-message-to`, this is specifically used with uosc, 
-    you must intall `uosc` firstly to use the menu). This script automatically saves 
-    the current playlist when mpv exit (controlled via `auto_save` config) and can 
+    sessions with `session-attach` or `session-load` (you can also switch a file using
+    `uosc` menu, which is the function `sessions-open-menu`, the default keybinding for
+    it is "h", you can change it via `script-message-to`, this is specifically used with uosc,
+    you must intall `uosc` firstly to use the menu). This script automatically saves
+    the current playlist when mpv exit (controlled via `auto_save` config) and can
     reload it if the player is started in idle mode (controlled via `auto_load` config).
 
     The script saves a text file containing the the full playlist of 5 sessions
@@ -336,14 +336,37 @@ local function set_session(index)
     end
 end
 
+local function sessions_add()
+    msg.debug("reading current playlist")
+    local session = read_current_session()
+    if not o.allow_duplicated_session then
+        local matches = match_session(session)
+        for _, i in ipairs(matches) do
+            msg.debug('removing session', i, 'since duplication')
+            table.remove(sessions, i)
+        end
+    end
+    if #sessions == o.max_sessions then
+        msg.debug('removing last session')
+        table.remove(sessions)
+    end
+    table.insert(sessions, session)
+    set_session(#sessions)
+end
+
 -- refresh current session, for empty session, update session index
 -- 1. when exit: save_hook
 -- 2. when switch session: attach_session, session_load
 -- 3. when query uosc menu
 local function refresh_session()
     if not empty_session() then
-        msg.debug("refreshing current session", current_session)
-        sessions[current_session] = read_current_session()
+        if current_session == 0 then -- we have added file manually to a empty session
+            msg.debug("refreshing current session")
+            sessions_add()
+        else -- in case of we update the playlist by adding new files
+            msg.debug("refreshing current session", current_session)
+            sessions[current_session] = read_current_session()
+        end
     else
         set_session(0)
     end
@@ -531,21 +554,7 @@ local function initialize_open()
         -- the function is not called until the file-loaded completed to let everything initialise
         -- otherwise reading current playlist becomes unreliable
         local function read_hook()
-            msg.debug("reading current playlist")
-            local session = read_current_session()
-            if not o.allow_duplicated_session then
-                local matches = match_session(session)
-                for _, i in ipairs(matches) do
-                    msg.debug('removing session', i, 'since duplication')
-                    table.remove(sessions, i)
-                end
-            end
-            if #sessions == o.max_sessions then
-                msg.debug('removing last session')
-                table.remove(sessions)
-            end
-            table.insert(sessions, session)
-            set_session(#sessions)
+            sessions_add()
             msg.debug("unregistering read_hook")
             mp.unregister_event(read_hook)
         end
