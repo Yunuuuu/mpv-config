@@ -170,14 +170,6 @@ local function initialize_session(pos)
     return session
 end
 
-local function add_session_file(session, file)
-    if o.remove_deleted and not file_exist(file) then
-        return
-    end
-    msg.debug('adding file:', file)
-    table.insert(session, file)
-end
-
 -- return: A table of session index match provided session
 local function match_session(session)
     local value = table.concat(session, ";")
@@ -197,6 +189,8 @@ local function strsplit(str, sep)
     end
     return result
 end
+
+local function is_protocol(file) return file:find("^%a+://%a+") end
 
 -- prepare arguments and set defaults ------------------------------
 opt.read_options(o)
@@ -236,12 +230,23 @@ o.__by_loading__ = mp.get_opt(script_name .. "-__by_loading__")
 msg.debug("getting option __by_loading__:", o.__by_loading__)
 o.__by_loading__ = set_default(o.__by_loading__, false)
 
+-- add file to session
+local function session_add(session, file)
+    if is_protocol(file) then
+        msg.debug('  adding protocal:', file)
+        table.insert(session, file)
+    elseif file_exist(file) or not o.remove_deleted then
+        msg.debug('  adding local file:', file)
+        table.insert(session, file)
+    end
+end
+
 -- turns the session_file into a table and adds all the files to the playlist
 -- return: adverse effect, modify global variable: sessions.
 local function read_history_sessions(file)
     file = set_default(file, o.session_file)
     --loads the session file
-    msg.debug('reading history sessions from', file)
+    msg.debug('reading history sessions from:', file)
     local oo = io.open(file, "r")
 
     --this should only occur when loading the script for the first time,
@@ -251,7 +256,7 @@ local function read_history_sessions(file)
         return
     end
     -- read session index firstly
-    msg.debug('reading session index')
+    msg.debug('  reading session index')
     -- if zero, means last session is empty
     local session_index = oo:read()
     last_valid_session = tonumber(string.match(session_index, '^(%d+):%d+$')) or last_valid_session
@@ -262,14 +267,14 @@ local function read_history_sessions(file)
 
     while true do
         local line = oo:read()
-        msg.debug('Debugging line:', line)
+        msg.debug('  debugging line:', line)
         if line == "[playlist]" or line == nil then
-            if session ~= nil then
+            if session ~= nil and #session > 0 then
                 -- check duplicates
                 if not o.allow_duplicated_session then
                     local matches = match_session(session)
                     if #matches > 0 then
-                        msg.debug('skip duplicated sessions')
+                        msg.debug('  skip duplicated sessions')
                         return nil
                     end
                 end
@@ -279,20 +284,20 @@ local function read_history_sessions(file)
             if line == nil then break end
             -- prepare the reading of the next session
             if #sessions == o.max_sessions then
-                msg.debug('excessive sessions')
+                msg.debug('  skip excessive sessions')
                 break
             end
             wait_position = true
         elseif wait_position then
             -- the first one should be the position of current playlist
             local pos = tonumber(line)
-            msg.debug('adding one session')
-            msg.debug('playlist position at', pos)
+            msg.debug('  adding one session')
+            msg.debug('  playlist position at', pos)
             session = initialize_session(pos)
             wait_position = false
         else
             local file_path = string.match(line, 'File=(.+)')
-            add_session_file(session, file_path)
+            session_add(session, file_path)
         end
     end
     msg.debug('imported', #sessions, 'sessions')
@@ -305,22 +310,24 @@ end
 -- 2. We use session index of 0 to indicate empty session
 -- return: A table
 local function read_current_session()
+    msg.debug("reading current playlist")
     -- mpv uses 0 based array indices, but lua uses 1-based
     local working_directory = mp.get_property('working-directory')
     local playlist = mp.get_property_native('playlist')
     local pos = mp.get_property_number("playlist-pos")
-    msg.debug('playlist position at', pos)
+    msg.debug('  playlist position at', pos)
     local session = initialize_session(pos)
     for _, v in ipairs(playlist) do
-        msg.debug('adding', v.filename, 'to playlist')
+        msg.debug('  reading', v.filename, 'from playlist')
 
         --if the file is available then it attempts to expand the path in-case of relative playlists
         --presumably if the file contains a protocol then it shouldn't be expanded
-        if not v.filename:find("^%a*://") then
-            msg.debug('expanded path:', v.filename)
+        if not is_protocol(v.filename) then
+            msg.debug('  expanding file path:', v.filename)
             v.filename = utils.join_path(working_directory, v.filename)
+            msg.debug('  expanded path:', v.filename)
         end
-        add_session_file(session, v.filename)
+        session_add(session, v.filename)
     end
     return session
 end
@@ -337,7 +344,7 @@ local function set_session(index)
 end
 
 local function sessions_add()
-    msg.debug("reading current playlist")
+    msg.debug("adding current session")
     local session = read_current_session()
     if not o.allow_duplicated_session then
         local matches = match_session(session)
@@ -347,7 +354,7 @@ local function sessions_add()
         end
     end
     if #sessions == o.max_sessions then
-        msg.debug('removing last session')
+        msg.debug('removing last session since excessive')
         table.remove(sessions)
     end
     table.insert(sessions, session)
@@ -631,9 +638,15 @@ local function menu_add_file(menu, session, session_index)
     local active_position = mp.get_property_number("playlist-pos-1")
     local active = session_index == current_session
     for position, v in ipairs(session) do
+        msg.debug("    debugging", v)
         local submenu = {}
-        if not file_exist(v) then
+        if is_protocol(v) or file_exist(v) then
+            msg.debug("    adding", v)
+            submenu.hint = tostring(position)
+            submenu.value = command("sessions-play-file " .. position .. " " .. session_index)
+        else
             if o.hide_deleted then
+                msg.debug("    not found", v)
                 goto continue
             else
                 submenu.hint = "deleted"
@@ -647,9 +660,6 @@ local function menu_add_file(menu, session, session_index)
                     value = command("sessions-delete-file " .. position .. " " .. session_index)
                 })
             end
-        else
-            submenu.hint = tostring(position)
-            submenu.value = command("sessions-play-file " .. position .. " " .. session_index)
         end
         -- remove trailing / or \\ and keep the basename
         submenu.title = string.match(string.gsub(v, "[\\/]+$", ""), "([^\\/]+)$")
@@ -672,7 +682,7 @@ local function load_menu()
     local prev_index = current_session - 1
     local prev_session = sessions[prev_index]
     if prev_session then
-        msg.debug('adding previous session playlist from session', prev_index .. ",", #prev_session, "files")
+        msg.debug('  menu: adding previous session playlist from session', prev_index, "(n:", #prev_session .. ")")
         local previous_sessions_menu = {}
         table.insert(menu.items, { title = "Previous Session", hint = "", items = previous_sessions_menu })
         local index = prev_index - 1
@@ -695,7 +705,7 @@ local function load_menu()
     local next_index = current_session + 1
     local next_session = sessions[next_index]
     if next_session then
-        msg.debug('adding next session playlist from session', next_index .. ",", #next_session, "files")
+        msg.debug('  menu: adding next session playlist from session', next_index, "(n:", #next_session .. ")")
         local next_sessions_menu = {}
         table.insert(menu.items, { title = "Next Session", hint = "", items = next_sessions_menu })
         local index = next_index + 1
@@ -715,7 +725,7 @@ local function load_menu()
     end
 
     -- add current playlist
-    msg.debug('adding current session playlist')
+    msg.debug('  menu: adding current session playlist')
     local session = sessions[current_session]
     if session then menu_add_file(menu.items, session, current_session) end
     return menu
