@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: vzdaw-wwnt7
+created: 2025-04-26T12:33:26+02:00
